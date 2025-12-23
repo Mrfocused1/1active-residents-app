@@ -1,0 +1,450 @@
+{
+  "Camden": {
+    "name": "London Borough of Camden",
+    "website": "https://www.camden.gov.uk",
+    "phone": "020 7974 4444",
+    "region": "London",
+    "type": "London Borough",
+    "rssFeeds": [
+      {
+        "url": "https://news.camden.gov.uk/feed/",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Georgia Gould",
+        "party": "Labour",
+        "role": "Leader of Camden Council",
+        "email": "georgia.gould@camden.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Meena Kishinani",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@camden.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transport",
+        "head": "Director of Highways and Transport",
+        "phone": "020 7974 4444",
+        "email": "highways@camden.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights", "road markings", "street signs"]
+      },
+      "waste": {
+        "name": "Waste and Recycling Services",
+        "head": "Waste Services Manager",
+        "phone": "020 7974 1234",
+        "email": "recycling@camden.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste", "missed collection", "street cleaning"]
+      },
+      "parks": {
+        "name": "Parks and Open Spaces",
+        "head": "Parks Manager",
+        "phone": "020 7974 1111",
+        "email": "parks@camden.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "playgrounds", "grass cutting", "hedges"]
+      },
+      "housing": {
+        "name": "Housing Services",
+        "head": "Director of Housing",
+        "phone": "020 7974 4444",
+        "email": "housing@camden.gov.uk",
+        "categories": ["housing repairs", "council housing", "estate maintenance"]
+      }
+    }
+  },
+  "Westminster": {
+    "name": "City of Westminster",
+    "website": "https://www.westminster.gov.uk",
+    "phone": "020 7641 6000",
+    "region": "London",
+    "type": "London Borough",
+    "rssFeeds": [
+      {
+        "url": "https://www.westminster.gov.uk/news/rss.xml",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Adam Hug",
+        "party": "Labour",
+        "role": "Leader of Westminster City Council",
+        "email": "ahug@westminster.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Stuart Love",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@westminster.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transport",
+        "head": "Director of City Highways",
+        "phone": "020 7641 2000",
+        "email": "highways@westminster.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights", "road markings"]
+      },
+      "waste": {
+        "name": "Waste and Street Environment",
+        "head": "Waste Services Director",
+        "phone": "020 7641 7950",
+        "email": "waste@westminster.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste", "street cleaning"]
+      },
+      "parks": {
+        "name": "Parks and Green Spaces",
+        "head": "Parks Manager",
+        "phone": "020 7641 2814",
+        "email": "parks@westminster.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "playgrounds", "grass cutting"]
+      }
+    }
+  },
+  "Islington": {
+    "name": "London Borough of Islington",
+    "website": "https://www.islington.gov.uk",
+    "phone": "020 7527 2000",
+    "region": "London",
+    "type": "London Borough",
+    "rssFeeds": [
+      {
+        "url": "https://www.islington.gov.uk/rss.xml",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Kaya Comer-Schwartz",
+        "party": "Labour",
+        "role": "Leader of Islington Council",
+        "email": "kaya.comer-schwartz@islington.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Zina Etheridge",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@islington.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transportation",
+        "head": "Highways Manager",
+        "phone": "020 7527 2000",
+        "email": "highways@islington.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Waste and Recycling",
+        "head": "Waste Operations Manager",
+        "phone": "020 7527 2000",
+        "email": "recycling@islington.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste", "missed collection"]
+      },
+      "parks": {
+        "name": "Parks and Leisure",
+        "head": "Parks Manager",
+        "phone": "020 7527 2000",
+        "email": "parks@islington.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "playgrounds"]
+      }
+    }
+  },
+  "Hackney": {
+    "name": "London Borough of Hackney",
+    "website": "https://www.hackney.gov.uk",
+    "phone": "020 8356 5000",
+    "region": "London",
+    "type": "London Borough",
+    "rssFeeds": [
+      {
+        "url": "https://news.hackney.gov.uk/feed/",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Caroline Woodley",
+        "party": "Labour",
+        "role": "Mayor of Hackney",
+        "email": "caroline.woodley@hackney.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Dawn Cafferty",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@hackney.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transport",
+        "head": "Highways Manager",
+        "phone": "020 8356 8428",
+        "email": "highways@hackney.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Waste and Recycling",
+        "head": "Waste Manager",
+        "phone": "020 8356 6688",
+        "email": "waste@hackney.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste", "street cleaning"]
+      },
+      "parks": {
+        "name": "Parks and Green Spaces",
+        "head": "Parks Service Manager",
+        "phone": "020 8356 3000",
+        "email": "parks@hackney.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "playgrounds"]
+      }
+    }
+  },
+  "Bromley": {
+    "name": "London Borough of Bromley",
+    "website": "https://www.bromley.gov.uk",
+    "phone": "020 8464 3333",
+    "region": "London",
+    "type": "London Borough",
+    "rssFeeds": [
+      {
+        "url": "https://www.bromley.gov.uk/news/rss.xml",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Colin Smith",
+        "party": "Conservative",
+        "role": "Leader of Bromley Council",
+        "email": "colin.smith@bromley.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Ade Adetosoye",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@bromley.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Traffic Management",
+        "head": "Highways Manager",
+        "phone": "020 8464 3333",
+        "email": "highways@bromley.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Environment and Waste",
+        "head": "Waste Services Manager",
+        "phone": "020 8464 3333",
+        "email": "waste@bromley.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste"]
+      },
+      "parks": {
+        "name": "Parks and Countryside",
+        "head": "Parks Manager",
+        "phone": "020 8464 3333",
+        "email": "parks@bromley.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "playgrounds"]
+      }
+    }
+  },
+  "Southwark": {
+    "name": "London Borough of Southwark",
+    "website": "https://www.southwark.gov.uk",
+    "phone": "020 7525 5000",
+    "region": "London",
+    "type": "London Borough",
+    "rssFeeds": [
+      {
+        "url": "https://www.southwark.gov.uk/news/rss",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Kieron Williams",
+        "party": "Labour",
+        "role": "Leader of Southwark Council",
+        "email": "kieron.williams@southwark.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Althea Loderick",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@southwark.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transport",
+        "head": "Highways Manager",
+        "phone": "020 7525 2000",
+        "email": "highways@southwark.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Waste and Cleansing",
+        "head": "Waste Manager",
+        "phone": "020 7525 2000",
+        "email": "waste@southwark.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste", "street cleaning"]
+      },
+      "parks": {
+        "name": "Parks and Leisure",
+        "head": "Parks Manager",
+        "phone": "020 7525 2000",
+        "email": "parks@southwark.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "playgrounds"]
+      }
+    }
+  },
+  "Buckinghamshire": {
+    "name": "Buckinghamshire Council",
+    "website": "https://www.buckinghamshire.gov.uk",
+    "phone": "01296 395000",
+    "region": "South East England",
+    "type": "Unitary Authority",
+    "rssFeeds": [
+      {
+        "url": "https://www.buckinghamshire.gov.uk/news/rss.xml",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Martin Tett",
+        "party": "Conservative",
+        "role": "Leader of Buckinghamshire Council",
+        "email": "martin.tett@buckinghamshire.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Rachael Shimmin",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@buckinghamshire.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Transport and Highways",
+        "head": "Highways Manager",
+        "phone": "01296 382416",
+        "email": "transport@buckinghamshire.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Waste and Recycling",
+        "head": "Waste Manager",
+        "phone": "01296 395000",
+        "email": "waste@buckinghamshire.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste"]
+      },
+      "environment": {
+        "name": "Environment and Climate Change",
+        "head": "Environment Manager",
+        "phone": "01296 395000",
+        "email": "environment@buckinghamshire.gov.uk",
+        "categories": ["trees", "graffiti", "parks", "countryside"]
+      }
+    }
+  },
+  "Oxfordshire": {
+    "name": "Oxfordshire County Council",
+    "website": "https://www.oxfordshire.gov.uk",
+    "phone": "01865 792422",
+    "region": "South East England",
+    "type": "County Council",
+    "rssFeeds": [
+      {
+        "url": "https://news.oxfordshire.gov.uk/feed/",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Liz Leffman",
+        "party": "Liberal Democrat",
+        "role": "Leader of Oxfordshire County Council",
+        "email": "liz.leffman@oxfordshire.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Giles Perritt",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@oxfordshire.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transport",
+        "head": "Highways Manager",
+        "phone": "0345 310 1111",
+        "email": "highways@oxfordshire.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Waste Management",
+        "head": "Waste Manager",
+        "phone": "01865 815000",
+        "email": "waste@oxfordshire.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste"]
+      },
+      "environment": {
+        "name": "Environment and Place",
+        "head": "Environment Manager",
+        "phone": "01865 792422",
+        "email": "environment@oxfordshire.gov.uk",
+        "categories": ["trees", "graffiti", "parks"]
+      }
+    }
+  },
+  "West Northamptonshire": {
+    "name": "West Northamptonshire Council",
+    "website": "https://www.westnorthants.gov.uk",
+    "phone": "0300 126 7000",
+    "region": "East Midlands",
+    "type": "Unitary Authority",
+    "rssFeeds": [
+      {
+        "url": "https://www.westnorthants.gov.uk/news/rss",
+        "type": "news"
+      }
+    ],
+    "leadership": {
+      "councilLeader": {
+        "name": "Jonathan Nunn",
+        "party": "Conservative",
+        "role": "Leader of West Northamptonshire Council",
+        "email": "jonathan.nunn@westnorthants.gov.uk"
+      },
+      "chiefExecutive": {
+        "name": "Anna Earnshaw",
+        "role": "Chief Executive",
+        "email": "chiefexecutive@westnorthants.gov.uk"
+      }
+    },
+    "departments": {
+      "highways": {
+        "name": "Highways and Transport",
+        "head": "Highways Manager",
+        "phone": "0300 126 1000",
+        "email": "highways@westnorthants.gov.uk",
+        "categories": ["potholes", "road defects", "street lights", "parking", "traffic lights"]
+      },
+      "waste": {
+        "name": "Waste and Recycling",
+        "head": "Waste Manager",
+        "phone": "0300 126 7000",
+        "email": "waste@westnorthants.gov.uk",
+        "categories": ["bins", "recycling", "fly-tipping", "bulky waste"]
+      },
+      "environment": {
+        "name": "Environment Services",
+        "head": "Environment Manager",
+        "phone": "0300 126 7000",
+        "email": "environment@westnorthants.gov.uk",
+        "categories": ["trees", "graffiti", "parks"]
+      }
+    }
+  }
+}

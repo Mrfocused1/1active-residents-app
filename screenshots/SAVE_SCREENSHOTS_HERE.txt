@@ -1,0 +1,15 @@
+SAVE YOUR 5 SCREENSHOTS HERE
+
+Please save the screenshots you showed me to this directory with these names:
+
+1. 01-map-view.png - Map with issue markers
+2. 02-category-selection.png - "What needs fixing?" screen
+3. 03-report-form.png - Report an Issue form
+4. 04-confirmation.png - Confirm Report screen
+5. 05-profile.png - My Profile screen
+
+These screenshots are ready for App Store Connect upload in the 6.7" Display section.
+
+Size: 1290 × 2796 px (iPhone 16 Plus)
+Format: PNG
+Status: Ready for submission ✅
