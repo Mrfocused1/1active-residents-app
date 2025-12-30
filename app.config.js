@@ -25,7 +25,7 @@ export default {
       backgroundColor: "#5B7CFA"
     },
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: "uk.co.activeresidents.mobile",
       infoPlist: {
         NSLocationWhenInUseUsageDescription: "Active Residents uses your location to show nearby community issues on the map.",
