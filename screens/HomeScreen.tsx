@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,11 @@ import {
   getStatusColor,
   hasFixMyStreetAPI,
 } from '../services/fixmystreet.service';
-import { getCouncilData, AggregatedReport, AggregatedNews, CouncilData } from '../services/dataAggregator.service';
+import { AggregatedReport, AggregatedNews, CouncilData } from '../services/dataAggregator.service';
 import { CouncilInfoCard } from '../components/CouncilInfoCard';
 import CouncilsService from '../services/councils.service';
+import { useCouncilData } from '../hooks/useCouncilData';
+import { RefreshButton } from '../components/RefreshButton';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +42,7 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
-  userName = 'Sarah',
+  userName = 'User',
   council = 'Camden',
   onStartReport,
   onSeeAll,
@@ -52,68 +54,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onReportPress,
   onNewsPress
 }) => {
-  const [recentReports, setRecentReports] = useState<any[]>([]);
-  const [councilNews, setCouncilNews] = useState<AggregatedNews[]>([]);
-  const [councilUpdate, setCouncilUpdate] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [councilData, setCouncilData] = useState<CouncilData | null>(null);
-
-  useEffect(() => {
-    loadCouncilData();
-  }, [council]);
-
-  const loadCouncilData = async () => {
-    try {
-      setLoading(true);
-      console.log('Loading data for council:', council);
-
-      // Fetch comprehensive council data from all APIs
-      // Note: Departments now use local database (instant, no API calls)
-      const data = await getCouncilData(council, {
-        includeReports: true,
-        includeNews: true,
-        includeUpdates: true,
-        includeDepartments: true, // Now instant - uses local database, not AI
-        maxReports: 3,
-        maxNews: 5,
-      });
-
-      console.log('Loaded data:', {
-        reports: data.reports.length,
-        news: data.news.length,
-        updates: data.updates.length,
-      });
-
-      // Store full council data
-      setCouncilData(data);
-
-      // Transform reports to UI format
-      const transformedReports = data.reports.map((report: AggregatedReport) => ({
-        id: report.id,
-        title: report.title,
-        location: report.description || report.title,
-        time: formatReportTime(report.date),
-        status: getStatusLabel(report.status),
-        statusColor: getStatusColor(report.status),
-        borderColor: getStatusColor(report.status),
-        hasImage: false,
-        icon: getIconForCategory(report.category),
-        rawData: report,
-      }));
-
-      setRecentReports(transformedReports);
-      setCouncilNews(data.news);
-
-      // Set latest update
-      if (data.updates.length > 0) {
-        setCouncilUpdate(data.updates[0].title);
-      }
-    } catch (error) {
-      console.warn('Error loading council data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use cached council data
+  const { data: councilData, loading, lastUpdated, refresh } = useCouncilData(council, {
+    includeReports: true,
+    includeNews: true,
+    includeUpdates: true,
+    includeDepartments: true,
+    maxReports: 3,
+    maxNews: 5,
+  });
 
   const formatNewsDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -140,6 +89,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return categoryMap[category] || 'report-problem';
   };
 
+  // Transform reports to UI format
+  const recentReports = useMemo(() => {
+    if (!councilData?.reports) return [];
+    return councilData.reports.map((report: AggregatedReport) => ({
+      id: report.id,
+      title: report.title,
+      location: report.description || report.title,
+      time: formatReportTime(report.date),
+      status: getStatusLabel(report.status),
+      statusColor: getStatusColor(report.status),
+      borderColor: getStatusColor(report.status),
+      hasImage: false,
+      icon: getIconForCategory(report.category),
+      rawData: report,
+    }));
+  }, [councilData?.reports]);
+
+  // Get council news
+  const councilNews = councilData?.news || [];
+
+  // Get latest update
+  const councilUpdate = councilData?.updates?.[0]?.title || null;
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -154,15 +126,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Header */}
         <FadeIn delay={100} duration={500}>
           <View style={styles.header}>
-            <View>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.nameText}>Hi, {userName}!</Text>
+            <View style={styles.headerLeft}>
+              <Text style={styles.nameText} numberOfLines={1}>Hi, {userName?.split(' ')[0] || 'there'}!</Text>
             </View>
-            <ScalePress onPress={onNotifications}>
-              <View style={styles.notificationButton}>
-                <MaterialIcons name="notifications-none" size={24} color="#64748B" />
-              </View>
-            </ScalePress>
+            <View style={styles.headerRight}>
+              <RefreshButton
+                lastUpdated={lastUpdated}
+                isRefreshing={loading}
+                onRefresh={refresh}
+              />
+              <ScalePress onPress={onNotifications}>
+                <View style={styles.notificationButton}>
+                  <MaterialIcons name="notifications-none" size={24} color="#64748B" />
+                </View>
+              </ScalePress>
+            </View>
           </View>
         </FadeIn>
 
@@ -492,15 +470,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
+  headerLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
   welcomeText: {
     fontSize: 14,
     color: '#9CA3AF',
     fontWeight: '500',
-    marginBottom: 4,
   },
   nameText: {
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '700',
     color: '#333344',
   },

@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
-const CARD_HEIGHT = height * 0.55;
+const CARD_HEIGHT = height * 0.45;
 
 interface WelcomeScreenProps {
   onGetStarted?: () => void;
@@ -247,10 +247,10 @@ const styles = StyleSheet.create({
     bottom: -1,
     left: 0,
     right: 0,
-    height: 100,
+    height: 50,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
   },
 
   // Cards Container
@@ -412,15 +412,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 32,
-    paddingTop: 8,
-    paddingBottom: 40,
+    paddingTop: 0,
+    paddingBottom: 24,
     alignItems: 'center',
     zIndex: 20,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 16,
+    marginBottom: 16,
+    marginTop: 0,
   },
   title: {
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   paginationDots: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   dot: {
     width: 10,
@@ -460,8 +460,8 @@ const styles = StyleSheet.create({
   // Buttons
   buttonsContainer: {
     width: '100%',
-    gap: 16,
-    marginTop: 'auto',
+    gap: 12,
+    marginTop: 16,
   },
   primaryButton: {
     width: '100%',

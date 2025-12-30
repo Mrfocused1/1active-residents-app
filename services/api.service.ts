@@ -1,14 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
+// For local testing: Use your computer's IP address (not localhost)
+// For production: Use your Railway URL
+const LOCAL_IP = '192.168.1.185';  // Your computer's IP - update if it changes
 const API_URL = __DEV__
-  ? 'http://localhost:3000/api'
-  : 'https://your-production-api.com/api';
+  ? `http://${LOCAL_IP}:3000/api`  // Local backend for development
+  : 'https://1active-residents-app-production.up.railway.app/api';  // Production backend
 
 const TOKEN_KEY = '@active_residents_token';
 
 // Enable mock mode when backend is not available
-const USE_MOCK_DATA = true; // Set to false when backend is running
+const USE_MOCK_DATA = false; // Set to true only for development without backend
 
 // Mock Data
 const MOCK_DATA = {
@@ -102,10 +105,11 @@ class ApiService {
     return headers;
   }
 
-  // Generic request method
+  // Generic request method with timeout
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeoutMs: number = 15000  // 15 second timeout
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
 
@@ -117,8 +121,14 @@ class ApiService {
       },
     };
 
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    config.signal = controller.signal;
+
     try {
       const response = await fetch(url, config);
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (!response.ok) {
@@ -126,7 +136,12 @@ class ApiService {
       }
 
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.error('API Request Timeout:', endpoint);
+        throw new Error('Request timed out. Please check your connection.');
+      }
       console.error('API Request Error:', error);
       throw error;
     }
@@ -166,6 +181,21 @@ class ApiService {
 
   async logout() {
     await this.removeToken();
+  }
+
+  async deleteAccount(password: string) {
+    // Call backend to delete account
+    const response = await this.request('/auth/delete-account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+
+    // Clear local token after successful deletion
+    if (response.success) {
+      await this.removeToken();
+    }
+
+    return response;
   }
 
   async getCurrentUser() {

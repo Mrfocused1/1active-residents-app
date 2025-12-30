@@ -9,10 +9,14 @@ import {
   Switch,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { FadeIn, SlideIn, ScalePress } from '../components/animations';
 import ApiService from '../services/api.service';
+import pushNotifications from '../services/pushNotifications.service';
 
 interface ProfileScreenProps {
   council?: string;
@@ -27,6 +31,10 @@ interface ProfileScreenProps {
   onTermsPrivacy?: () => void;
   onEditProfile?: () => void;
   onAnalyticsDashboard?: () => void;
+  onLogout?: () => void;
+  onEmailPress?: (email: string) => void;
+  onPhonePress?: (phone: string) => void;
+  onAddressPress?: (address: { street: string; city: string; postcode: string }) => void;
 }
 
 interface UserData {
@@ -56,8 +64,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onTermsPrivacy,
   onEditProfile,
   onAnalyticsDashboard,
+  onLogout,
+  onEmailPress,
+  onPhonePress,
+  onAddressPress,
 }) => {
-  const [pushNotifications, setPushNotifications] = useState(true);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(true);
+  const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
   const [userData, setUserData] = useState<UserData>({
     name: 'User',
     email: 'user@example.com',
@@ -65,13 +78,124 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
   });
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load push notification preference on mount
+  useEffect(() => {
+    loadPushNotificationPreference();
+  }, []);
+
   useEffect(() => {
     fetchUserData();
   }, [refreshKey]); // Re-fetch when profile is updated
 
+  const loadPushNotificationPreference = async () => {
+    try {
+      // Check both saved preference and actual permission status
+      const savedPref = await AsyncStorage.getItem('@push_notifications_enabled');
+      const { status } = await Notifications.getPermissionsAsync();
+
+      // If permission denied, toggle should be off regardless of saved preference
+      if (status !== 'granted') {
+        setPushNotificationsEnabled(false);
+        await AsyncStorage.setItem('@push_notifications_enabled', 'false');
+      } else if (savedPref !== null) {
+        setPushNotificationsEnabled(savedPref === 'true');
+      }
+    } catch (error) {
+      console.error('Error loading push notification preference:', error);
+    }
+  };
+
+  const handlePushNotificationToggle = async (value: boolean) => {
+    setIsTogglingNotifications(true);
+
+    try {
+      if (value) {
+        // User wants to enable notifications
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+
+        if (existingStatus !== 'granted') {
+          // Need to request permission
+          const { status } = await Notifications.requestPermissionsAsync();
+
+          if (status !== 'granted') {
+            // Permission denied
+            Alert.alert(
+              'Permission Required',
+              'To receive push notifications, please enable them in your device settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Open Settings',
+                  onPress: () => {
+                    // This opens iOS settings (Android handled differently)
+                    if (Platform.OS === 'ios') {
+                      import('react-native').then(({ Linking }) => {
+                        Linking.openSettings();
+                      });
+                    }
+                  }
+                },
+              ]
+            );
+            setIsTogglingNotifications(false);
+            return;
+          }
+        }
+
+        // Permission granted, save preference
+        await AsyncStorage.setItem('@push_notifications_enabled', 'true');
+        setPushNotificationsEnabled(true);
+
+        // Re-register for push notifications
+        await pushNotifications.registerForPushNotifications();
+
+      } else {
+        // User wants to disable notifications
+        await AsyncStorage.setItem('@push_notifications_enabled', 'false');
+        setPushNotificationsEnabled(false);
+
+        // Note: We can't revoke permission programmatically, but we can:
+        // 1. Stop registering the token with backend
+        // 2. The backend can check this preference before sending
+      }
+    } catch (error) {
+      console.error('Error toggling push notifications:', error);
+      Alert.alert('Error', 'Could not update notification settings. Please try again.');
+    } finally {
+      setIsTogglingNotifications(false);
+    }
+  };
+
   const fetchUserData = async () => {
     try {
       setIsLoading(true);
+
+      // First, try to load from local storage as a fallback
+      const localName = await AsyncStorage.getItem('@user_name');
+      const localEmail = await AsyncStorage.getItem('@user_email');
+
+      if (localName || localEmail) {
+        const initials = localName
+          ? localName.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+          : 'U';
+
+        setUserData(prev => ({
+          ...prev,
+          name: localName || prev.name,
+          email: localEmail || prev.email,
+          initials,
+        }));
+      }
+
+      // Check for auth token
+      const token = await AsyncStorage.getItem('@active_residents_token');
+      if (!token) {
+        console.log('📝 No auth token, using local profile data');
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to fetch from API for most up-to-date data
       const response = await ApiService.getCurrentUser();
 
       if (response.data) {
@@ -81,18 +205,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
           : 'U';
 
         setUserData({
-          name: user.name || 'User',
-          email: user.email || 'user@example.com',
+          name: user.name || localName || 'User',
+          email: user.email || localEmail || '',
           phone: user.phone,
           address: user.address,
           location: user.address?.city || user.location,
           initials,
           profilePhoto: user.profilePhoto || null,
         });
+
+        // Update local storage with latest data from API
+        if (user.name) await AsyncStorage.setItem('@user_name', user.name);
+        if (user.email) await AsyncStorage.setItem('@user_email', user.email);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      // Keep default values if API fails
+      console.log('📝 Could not fetch profile from API, using local data');
+      // Keep local/default values if API fails
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +285,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Contact Info</Text>
             <View style={styles.card}>
-              <ScalePress>
+              <ScalePress onPress={() => onEmailPress?.(userData.email)}>
                 <View style={styles.contactItem}>
                   <View style={[styles.contactIcon, { backgroundColor: 'rgba(91, 124, 250, 0.1)' }]}>
                     <MaterialIcons name="mail" size={20} color="#5B7CFA" />
@@ -173,7 +301,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {userData.phone && (
                 <>
                   <View style={styles.divider} />
-                  <ScalePress>
+                  <ScalePress onPress={() => onPhonePress?.(userData.phone!)}>
                     <View style={styles.contactItem}>
                       <View style={[styles.contactIcon, { backgroundColor: 'rgba(77, 182, 172, 0.1)' }]}>
                         <MaterialIcons name="phone" size={20} color="#4DB6AC" />
@@ -191,7 +319,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {userData.address && (
                 <>
                   <View style={styles.divider} />
-                  <ScalePress>
+                  <ScalePress onPress={() => onAddressPress?.(userData.address!)}>
                     <View style={styles.contactItem}>
                       <View style={[styles.contactIcon, { backgroundColor: 'rgba(255, 140, 102, 0.1)' }]}>
                         <MaterialIcons name="home" size={20} color="#FF8C66" />
@@ -245,8 +373,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   <Text style={styles.preferenceText}>Push Notifications</Text>
                 </View>
                 <Switch
-                  value={pushNotifications}
-                  onValueChange={setPushNotifications}
+                  value={pushNotificationsEnabled}
+                  onValueChange={handlePushNotificationToggle}
+                  disabled={isTogglingNotifications}
                   trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                   thumbColor="#FFFFFF"
                   ios_backgroundColor="#D1D5DB"
@@ -282,7 +411,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* Log Out Button */}
         <FadeIn delay={700}>
-          <ScalePress>
+          <ScalePress onPress={onLogout}>
             <View style={styles.logoutButton}>
               <MaterialIcons name="logout" size={20} color="#EF4444" />
               <Text style={styles.logoutText}>Log Out</Text>

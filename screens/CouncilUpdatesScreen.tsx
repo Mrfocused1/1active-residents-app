@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,15 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FadeIn, SlideIn, ScalePress } from '../components/animations';
-import { getCouncilData, AggregatedNews } from '../services/dataAggregator.service';
+import { AggregatedNews } from '../services/dataAggregator.service';
 import CouncilsService from '../services/councils.service';
+import { useCouncilData } from '../hooks/useCouncilData';
+import { RefreshButton } from '../components/RefreshButton';
 
 interface CouncilUpdatesScreenProps {
   council?: string;
   onBack?: () => void;
+  onHome?: () => void;
   onStartReport?: () => void;
   onSeeAll?: () => void;
   onProfile?: () => void;
@@ -31,6 +34,7 @@ interface CouncilUpdatesScreenProps {
 const CouncilUpdatesScreen: React.FC<CouncilUpdatesScreenProps> = ({
   council = 'Camden',
   onBack,
+  onHome,
   onStartReport,
   onSeeAll,
   onProfile,
@@ -43,81 +47,26 @@ const CouncilUpdatesScreen: React.FC<CouncilUpdatesScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedUpdates, setExpandedUpdates] = useState<Set<string>>(new Set());
   const [showAllFilters, setShowAllFilters] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [updates, setUpdates] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchCouncilData();
-  }, [council]);
+  // Use cached council data
+  const { data: councilData, loading, lastUpdated, refresh } = useCouncilData(council, {
+    includeReports: false,
+    includeNews: true,
+    includeUpdates: true,
+    maxNews: 20,
+  });
 
-  const fetchCouncilData = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch comprehensive council data from all 5 APIs
-      const data = await getCouncilData(council, {
-        includeReports: false,
-        includeNews: true,
-        includeUpdates: true,
-        maxNews: 20,
-      });
-
-      const combined: any[] = [];
-      const categoryColors: Record<string, string> = {
-        'Roadworks': '#FF8C66',
-        'Events': '#FFD572',
-        'Services': '#7E8CE0',
-        'Community': '#4DB6AC',
-        'Environment': '#10B981',
-        'Transport': '#8B5CF6',
-        'Planning': '#F97316',
-        'News': '#5B7CFA',
-        'Update': '#4DB6AC',
-      };
-
-      // Add news items
-      data.news.forEach((newsItem: AggregatedNews) => {
-        combined.push({
-          id: newsItem.id,
-          category: newsItem.category || 'News',
-          categoryColor: categoryColors[newsItem.category || 'News'] || '#5B7CFA',
-          title: newsItem.title,
-          description: newsItem.summary,
-          summary: newsItem.summary,
-          time: formatDate(newsItem.date),
-          date: newsItem.date,
-          icon: 'article',
-          hasImage: !!newsItem.imageUrl,
-          imageUrl: newsItem.imageUrl,
-          source: newsItem.source,
-          url: newsItem.url,
-        });
-      });
-
-      // Add updates
-      data.updates.forEach((update: AggregatedNews) => {
-        combined.push({
-          id: update.id,
-          category: update.category || 'Update',
-          categoryColor: categoryColors[update.category || 'Update'] || '#4DB6AC',
-          title: update.title,
-          description: update.summary,
-          time: formatDate(update.date),
-          date: update.date,
-          icon: getCategoryIcon(update.category || 'Update'),
-          hasImage: !!update.imageUrl,
-          imageUrl: update.imageUrl,
-          url: update.url,
-        });
-      });
-
-      setUpdates(combined);
-    } catch (error) {
-      console.warn('Error fetching council data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const categoryColors: Record<string, string> = {
+    'Roadworks': '#FF8C66',
+    'Events': '#FFD572',
+    'Services': '#7E8CE0',
+    'Community': '#4DB6AC',
+    'Environment': '#10B981',
+    'Transport': '#8B5CF6',
+    'Planning': '#F97316',
+    'News': '#5B7CFA',
+    'Update': '#4DB6AC',
   };
 
   const getCategoryIcon = (category: string): string => {
@@ -146,6 +95,51 @@ const CouncilUpdatesScreen: React.FC<CouncilUpdatesScreenProps> = ({
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     return `${Math.floor(diffDays / 30)} months ago`;
   };
+
+  // Transform news and updates to UI format
+  const updates = useMemo(() => {
+    if (!councilData) return [];
+
+    const combined: any[] = [];
+
+    // Add news items
+    (councilData.news || []).forEach((newsItem: AggregatedNews) => {
+      combined.push({
+        id: newsItem.id,
+        category: newsItem.category || 'News',
+        categoryColor: categoryColors[newsItem.category || 'News'] || '#5B7CFA',
+        title: newsItem.title,
+        description: newsItem.summary,
+        summary: newsItem.summary,
+        time: formatDate(newsItem.date),
+        date: newsItem.date,
+        icon: 'article',
+        hasImage: !!newsItem.imageUrl,
+        imageUrl: newsItem.imageUrl,
+        source: newsItem.source,
+        url: newsItem.url,
+      });
+    });
+
+    // Add updates
+    (councilData.updates || []).forEach((update: AggregatedNews) => {
+      combined.push({
+        id: update.id,
+        category: update.category || 'Update',
+        categoryColor: categoryColors[update.category || 'Update'] || '#4DB6AC',
+        title: update.title,
+        description: update.summary,
+        time: formatDate(update.date),
+        date: update.date,
+        icon: getCategoryIcon(update.category || 'Update'),
+        hasImage: !!update.imageUrl,
+        imageUrl: update.imageUrl,
+        url: update.url,
+      });
+    });
+
+    return combined;
+  }, [councilData]);
 
   const toggleExpand = (updateId: string) => {
     const newExpanded = new Set(expandedUpdates);
@@ -179,11 +173,19 @@ const CouncilUpdatesScreen: React.FC<CouncilUpdatesScreenProps> = ({
               <Text style={styles.headerTitle}>Council News</Text>
               <Text style={styles.headerSubtitle}>Latest updates & announcements</Text>
             </View>
-            <ScalePress onPress={onNotifications}>
-              <View style={styles.notificationButton}>
-                <MaterialIcons name="notifications-none" size={24} color="#64748B" />
-              </View>
-            </ScalePress>
+            <View style={styles.headerRight}>
+              <RefreshButton
+                lastUpdated={lastUpdated}
+                isRefreshing={loading}
+                onRefresh={refresh}
+                compact
+              />
+              <ScalePress onPress={onNotifications}>
+                <View style={styles.notificationButton}>
+                  <MaterialIcons name="notifications-none" size={24} color="#64748B" />
+                </View>
+              </ScalePress>
+            </View>
           </View>
         </FadeIn>
 
@@ -422,7 +424,7 @@ const CouncilUpdatesScreen: React.FC<CouncilUpdatesScreenProps> = ({
       <View style={styles.navContainer}>
         <View style={styles.navGradient} />
         <View style={styles.navBar}>
-          <TouchableOpacity style={styles.navItem} onPress={onBack} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.navItem} onPress={onHome} activeOpacity={0.8}>
             <MaterialIcons name="home" size={28} color="#9CA3AF" />
             <Text style={styles.navLabel}>Home</Text>
           </TouchableOpacity>
@@ -477,6 +479,11 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitle: {
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),

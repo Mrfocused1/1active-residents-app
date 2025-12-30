@@ -2,6 +2,7 @@ export default {
   expo: {
     name: "Active Residents",
     slug: "active-residents",
+    owner: "mrbusy2",
     version: "1.0.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
@@ -9,7 +10,7 @@ export default {
     icon: "./assets/icon.png",
     extra: {
       eas: {
-        projectId: "b47e3f2a-8c9d-4e1f-a6b2-3d5c8f9e1a7b"
+        projectId: "ecb6be5e-8e8a-460e-adec-961049391f16"
       },
       GEMINI_API_KEY: process.env.GEMINI_API_KEY,
       NEWS_API_KEY: process.env.NEWS_API_KEY,

@@ -21,6 +21,14 @@ const DeleteAccountScreen: React.FC<DeleteAccountScreenProps> = ({
 }) => {
   const [password, setPassword] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [passwordStartedTyping, setPasswordStartedTyping] = useState(false);
+
+  const handlePasswordChange = (text: string) => {
+    if (text.length > 0 && !passwordStartedTyping) {
+      setPasswordStartedTyping(true);
+    }
+    setPassword(text);
+  };
 
   const canDelete = password.length > 0 && confirmed;
 
@@ -104,10 +112,15 @@ const DeleteAccountScreen: React.FC<DeleteAccountScreenProps> = ({
                 style={styles.input}
                 placeholder="Your password"
                 placeholderTextColor="#9CA3AF"
-                secureTextEntry
+                secureTextEntry={passwordStartedTyping}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={handlePasswordChange}
                 autoCapitalize="none"
+                textContentType="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="default"
               />
               <MaterialIcons name="key" size={20} color="#9CA3AF" style={styles.inputIcon} />
             </View>
@@ -364,6 +377,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
+    pointerEvents: 'box-none',
   },
   bottomGradient: {
     height: 140,
@@ -374,6 +388,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 32,
     gap: 12,
+    pointerEvents: 'auto',
   },
   deleteButton: {
     flexDirection: 'row',

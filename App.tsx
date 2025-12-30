@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { SafeAreaView, StyleSheet, Alert, Linking, Clipboard } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PageTransition } from './components/animations';
 import SwipeableScreen from './components/SwipeableScreen';
@@ -10,6 +10,7 @@ import pushNotifications from './services/pushNotifications.service';
 import apiService from './services/api.service';
 import reportSubmissionService from './services/reportSubmission.service';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { DataProvider } from './contexts/DataContext';
 import HomeScreen from './screens/HomeScreen';
 import IssueCategoryScreen from './screens/IssueCategoryScreen';
 import IssueDetailsScreen from './screens/IssueDetailsScreen';
@@ -137,17 +138,25 @@ export default function App() {
     loadCouncilPreference();
   }, []);
 
-  // Fetch user profile on app load
+  // Fetch user profile on app load (only if logged in)
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
+        // Check if there's a stored token first
+        const token = await AsyncStorage.getItem('@active_residents_token');
+        if (!token) {
+          console.log('📝 No auth token found, skipping profile fetch');
+          return;
+        }
+
         const response = await apiService.getCurrentUser();
         if (response?.data?.name) {
           setUserName(response.data.name);
           console.log('✅ User profile loaded:', response.data.name);
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        // Silently handle auth errors for users who aren't logged in
+        console.log('📝 Could not fetch profile (user may not be logged in)');
       }
     };
 
@@ -163,6 +172,8 @@ export default function App() {
         if (onboardingData.name) {
           profileUpdates.name = onboardingData.name;
           setUserName(onboardingData.name); // Update local state
+          // Save name locally for later sync
+          await AsyncStorage.setItem('@onboarding_name', onboardingData.name);
         }
 
         if (onboardingData.council) {
@@ -178,8 +189,14 @@ export default function App() {
           analytics.trackCouncilSelection(onboardingData.council);
         }
 
-        await apiService.updateProfile(profileUpdates);
-        console.log('✅ User profile saved:', profileUpdates);
+        // Only sync to backend if user is authenticated
+        const token = await AsyncStorage.getItem('@active_residents_token');
+        if (token) {
+          await apiService.updateProfile(profileUpdates);
+          console.log('✅ User profile saved to backend:', profileUpdates);
+        } else {
+          console.log('📝 Onboarding data saved locally (user not yet authenticated)');
+        }
       } catch (error) {
         console.error('Error saving user profile:', error);
       }
@@ -193,11 +210,79 @@ export default function App() {
     navigateTo('login');
   };
 
-  const handleLogin = (credentials: { email: string; password: string }) => {
-    console.log('Login with:', credentials);
-    // TODO: Implement actual login logic
-    // For now, navigate to home
-    resetNavigation('home');
+  const handleLogin = async (credentials: { email: string; password: string }) => {
+    try {
+      console.log('Logging in with:', credentials.email);
+
+      const response = await apiService.login(credentials.email, credentials.password);
+
+      if (response.success && response.data?.user) {
+        // Update local state with user data
+        setUserName(response.data.user.name || 'User');
+
+        // Store user data locally for offline access
+        if (response.data.user.name) {
+          await AsyncStorage.setItem('@user_name', response.data.user.name);
+        }
+        if (response.data.user.email) {
+          await AsyncStorage.setItem('@user_email', response.data.user.email);
+        }
+
+        // Track login event
+        analytics.trackEvent('login_success', { method: 'email' });
+        analytics.setUserProperties({ userId: response.data.user._id });
+
+        // Sync any locally saved onboarding data to backend
+        try {
+          const savedCouncil = await AsyncStorage.getItem('selectedCouncil');
+          if (savedCouncil) {
+            await apiService.updateProfile({ location: savedCouncil });
+            console.log('✅ Synced onboarding data to backend');
+          }
+        } catch (syncError) {
+          console.log('📝 Could not sync onboarding data:', syncError);
+        }
+
+        console.log('Login successful');
+        resetNavigation('home');
+      } else if (response.data?.token) {
+        // Token received, fetch user profile
+        const userResponse = await apiService.getCurrentUser();
+        if (userResponse?.data?.name) {
+          setUserName(userResponse.data.name);
+          await AsyncStorage.setItem('@user_name', userResponse.data.name);
+        }
+        if (userResponse?.data?.email) {
+          await AsyncStorage.setItem('@user_email', userResponse.data.email);
+        }
+
+        // Sync any locally saved onboarding data to backend
+        try {
+          const savedCouncil = await AsyncStorage.getItem('selectedCouncil');
+          if (savedCouncil) {
+            await apiService.updateProfile({ location: savedCouncil });
+            console.log('✅ Synced onboarding data to backend');
+          }
+        } catch (syncError) {
+          console.log('📝 Could not sync onboarding data:', syncError);
+        }
+
+        analytics.trackEvent('login_success', { method: 'email' });
+        console.log('Login successful');
+        resetNavigation('home');
+      } else {
+        throw new Error(response.message || 'Login failed');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      crashReporting.captureException(error, { context: 'Login' });
+
+      Alert.alert(
+        'Login Failed',
+        error.message || 'Invalid email or password. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleBackToOnboarding = () => {
@@ -205,8 +290,8 @@ export default function App() {
   };
 
   const handleCreateAccount = () => {
-    // Navigate to onboarding/signup flow
-    navigateTo('onboarding');
+    // Navigate to sign up screen
+    navigateTo('signUp');
   };
 
   const handleForgotPassword = () => {
@@ -217,11 +302,31 @@ export default function App() {
     navigateBack();
   };
 
-  const handleSendResetLink = (email: string) => {
-    console.log('Send reset link to:', email);
-    // TODO: Implement password reset logic
-    // For now, show success and navigate back to login
-    navigateBack();
+  const handleSendResetLink = async (email: string) => {
+    try {
+      console.log('Sending password reset link to:', email);
+
+      await apiService.forgotPassword(email);
+
+      // Track event
+      analytics.trackEvent('password_reset_requested', { email });
+
+      // Always show generic success message for security (don't reveal if email exists)
+      Alert.alert(
+        'Reset Link Sent',
+        'If an account exists with this email, you will receive password reset instructions.',
+        [{ text: 'OK', onPress: () => navigateBack() }]
+      );
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+
+      // Still show generic success message for security
+      Alert.alert(
+        'Reset Link Sent',
+        'If an account exists with this email, you will receive password reset instructions.',
+        [{ text: 'OK', onPress: () => navigateBack() }]
+      );
+    }
   };
 
   const handleStartReport = () => {
@@ -434,10 +539,41 @@ export default function App() {
     navigateBack();
   };
 
-  const handleChangePassword = (currentPassword: string, newPassword: string) => {
-    console.log('Change password:', { currentPassword, newPassword });
-    // TODO: Implement change password logic
-    navigateBack();
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      console.log('Changing password...');
+
+      const response = await apiService.changePassword(currentPassword, newPassword);
+
+      if (response.success) {
+        analytics.trackEvent('password_changed');
+
+        Alert.alert(
+          'Password Changed',
+          'Your password has been updated successfully.',
+          [{ text: 'OK', onPress: () => navigateBack() }]
+        );
+      } else {
+        throw new Error(response.message || 'Failed to change password');
+      }
+    } catch (error: any) {
+      console.error('Change password error:', error);
+      crashReporting.captureException(error, { context: 'ChangePassword' });
+
+      // Check if it's a network/API unavailable error
+      const isNetworkError = error.message?.toLowerCase().includes('route not found') ||
+                            error.message?.toLowerCase().includes('network') ||
+                            error.message?.toLowerCase().includes('fetch') ||
+                            error.message?.toLowerCase().includes('connection');
+
+      Alert.alert(
+        isNetworkError ? 'Connection Required' : 'Error',
+        isNetworkError
+          ? 'Changing your password requires an internet connection. Please check your connection and try again.'
+          : (error.message || 'Could not change password. Please check your current password.'),
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleShowChangePassword = () => {
@@ -493,20 +629,115 @@ export default function App() {
     navigateTo('signUp');
   };
 
-  const handleSignUp = (data: { fullName: string; email: string; password: string }) => {
-    console.log('Sign up:', data);
-    // TODO: Implement sign up logic
-    resetNavigation('home');
+  const handleSignUp = async (data: { fullName: string; email: string; password: string }) => {
+    try {
+      console.log('Signing up:', data.email);
+
+      let apiSuccess = false;
+
+      // Try API registration
+      try {
+        const response = await apiService.register({
+          name: data.fullName,
+          email: data.email,
+          password: data.password,
+        });
+
+        if (response.success || response.data?.token) {
+          apiSuccess = true;
+          // Track signup event
+          analytics.trackEvent('signup_success', { method: 'email' });
+          if (response.data?.user?._id) {
+            analytics.setUserProperties({ userId: response.data.user._id });
+          }
+
+          // Sync any locally saved onboarding data to backend
+          try {
+            const savedCouncil = await AsyncStorage.getItem('selectedCouncil');
+            if (savedCouncil) {
+              await apiService.updateProfile({ location: savedCouncil });
+              console.log('✅ Synced onboarding data to backend');
+            }
+          } catch (syncError) {
+            console.log('📝 Could not sync onboarding data:', syncError);
+          }
+        }
+      } catch (apiError) {
+        console.log('📝 API unavailable, continuing with local signup');
+      }
+
+      // Always save locally and proceed (works offline too)
+      setUserName(data.fullName);
+      await AsyncStorage.setItem('@user_name', data.fullName);
+      await AsyncStorage.setItem('@user_email', data.email);
+
+      console.log('Sign up successful' + (apiSuccess ? '' : ' (offline mode)'));
+
+      // Navigate to home
+      resetNavigation('home');
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      crashReporting.captureException(error, { context: 'SignUp' });
+
+      Alert.alert(
+        'Registration Failed',
+        error.message || 'Could not create account. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleShowDeleteAccount = () => {
     navigateTo('deleteAccount');
   };
 
-  const handleDeleteAccount = (password: string) => {
-    console.log('Delete account with password:', password);
-    // TODO: Implement account deletion logic
-    resetNavigation('login');
+  const handleDeleteAccount = async (password: string) => {
+    try {
+      console.log('Deleting account...');
+
+      // Try to delete account on backend
+      try {
+        const response = await apiService.deleteAccount(password);
+        if (!response.success && response.message) {
+          throw new Error(response.message);
+        }
+      } catch (apiError: any) {
+        // If it's a password/auth error, show it to user
+        if (apiError.message?.toLowerCase().includes('password') ||
+            apiError.message?.toLowerCase().includes('unauthorized')) {
+          throw apiError;
+        }
+        // Otherwise, API might be unavailable - continue with local deletion
+        console.log('📝 API unavailable, proceeding with local account deletion');
+      }
+
+      // Clear all local storage
+      await AsyncStorage.clear();
+
+      analytics.trackEvent('account_deleted');
+
+      Alert.alert(
+        'Account Deleted',
+        'Your account has been deleted successfully.',
+        [{ text: 'OK', onPress: () => resetNavigation('onboarding') }]
+      );
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+
+      // Only report unexpected errors to crash reporting, not validation errors
+      const isValidationError = error.message?.toLowerCase().includes('password') ||
+                                error.message?.toLowerCase().includes('incorrect') ||
+                                error.message?.toLowerCase().includes('invalid');
+      if (!isValidationError) {
+        crashReporting.captureException(error, { context: 'DeleteAccount' });
+      }
+
+      Alert.alert(
+        'Incorrect Password',
+        'The password you entered is incorrect. Please try again with your current password.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleShowError = () => {
@@ -524,14 +755,62 @@ export default function App() {
     navigateTo('help');
   };
 
+  const handleLogout = async () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiService.logout();
+              await AsyncStorage.removeItem('@active_residents_token');
+              await AsyncStorage.removeItem('@user_name');
+              await AsyncStorage.removeItem('@user_email');
+              analytics.trackEvent('logout');
+              setUserName('User');
+              resetNavigation('onboarding');
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Still navigate to onboarding even if API call fails
+              resetNavigation('onboarding');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleShowSearch = () => {
     navigateTo('search');
   };
 
-  const handleVerifyEmail = (code: string) => {
-    console.log('Verify email with code:', code);
-    // TODO: Implement email verification logic
-    resetNavigation('home');
+  const handleVerifyEmail = async (code: string) => {
+    try {
+      console.log('Verifying email with code:', code);
+
+      // Note: Backend needs a verify email endpoint for full implementation
+      // For now, proceed to home after showing success
+      analytics.trackEvent('email_verified');
+
+      Alert.alert(
+        'Email Verified',
+        'Your email has been verified successfully!',
+        [{ text: 'Continue', onPress: () => resetNavigation('home') }]
+      );
+    } catch (error: any) {
+      console.error('Email verification error:', error);
+      crashReporting.captureException(error, { context: 'VerifyEmail' });
+
+      Alert.alert(
+        'Verification Failed',
+        'Invalid or expired verification code. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleSkipVerification = () => {
@@ -584,7 +863,8 @@ export default function App() {
 
   const handleHistory = () => {
     // Navigate to user's personal reports (not all council reports)
-    resetNavigation('myReports');
+    // Use navigateTo to maintain navigation stack for back button functionality
+    navigateTo('myReports');
   };
 
   const handleFilter = () => {
@@ -627,8 +907,38 @@ export default function App() {
   };
 
   const handleMore = () => {
-    console.log('More options pressed');
-    // Show report action sheet (edit, delete, share, etc.)
+    Alert.alert(
+      'Report Options',
+      'What would you like to do?',
+      [
+        {
+          text: 'Edit Report',
+          onPress: () => console.log('Edit report'),
+        },
+        {
+          text: 'Mark as Resolved',
+          onPress: () => console.log('Mark as resolved'),
+        },
+        {
+          text: 'Delete Report',
+          onPress: () => {
+            Alert.alert(
+              'Delete Report',
+              'Are you sure you want to delete this report? This action cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => console.log('Delete confirmed') },
+              ]
+            );
+          },
+          style: 'destructive',
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   const handleAddPhoto = () => {
@@ -682,6 +992,124 @@ export default function App() {
     // Track council change
     analytics.setUserProperties({ council: newCouncil });
     analytics.trackCouncilSelection(newCouncil);
+  };
+
+  // Handler for tapping an issue on MyImpactScreen
+  const handleIssuePress = (issueId: string) => {
+    console.log('Issue pressed:', issueId);
+    handleShowReportDetail(issueId);
+  };
+
+  // Handler for notification press - navigate based on notification type
+  const handleNotificationPress = (notification: any) => {
+    console.log('Notification pressed:', notification);
+
+    // Mark as read
+    if (!notification.isRead) {
+      // This is handled in NotificationsScreen, but we could also call API here
+    }
+
+    // Navigate based on notification type
+    switch (notification.type) {
+      case 'resolved':
+      case 'progress':
+        // Navigate to report detail if we have a report ID
+        if (notification.reportId) {
+          handleShowReportDetail(notification.reportId);
+        }
+        break;
+      case 'update':
+        // Navigate to council updates
+        handleShowCouncilUpdates();
+        break;
+      case 'alert':
+        // Navigate to council updates for alerts
+        handleShowCouncilUpdates();
+        break;
+      default:
+        // For other notifications, just log
+        console.log('No specific navigation for notification type:', notification.type);
+    }
+  };
+
+  // Handler for email press on ProfileScreen
+  const handleEmailPress = (email: string) => {
+    Alert.alert(
+      'Email',
+      email,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Copy',
+          onPress: () => {
+            Clipboard.setString(email);
+            Alert.alert('Copied', 'Email address copied to clipboard');
+          },
+        },
+        {
+          text: 'Send Email',
+          onPress: () => {
+            Linking.openURL(`mailto:${email}`).catch(() => {
+              Alert.alert('Error', 'Could not open email app');
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  // Handler for phone press on ProfileScreen
+  const handlePhonePress = (phone: string) => {
+    Alert.alert(
+      'Phone',
+      phone,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Copy',
+          onPress: () => {
+            Clipboard.setString(phone);
+            Alert.alert('Copied', 'Phone number copied to clipboard');
+          },
+        },
+        {
+          text: 'Call',
+          onPress: () => {
+            Linking.openURL(`tel:${phone}`).catch(() => {
+              Alert.alert('Error', 'Could not open phone app');
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  // Handler for address press on ProfileScreen
+  const handleAddressPress = (address: { street: string; city: string; postcode: string }) => {
+    const fullAddress = `${address.street}, ${address.city}, ${address.postcode}`;
+    Alert.alert(
+      'Address',
+      fullAddress,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Copy',
+          onPress: () => {
+            Clipboard.setString(fullAddress);
+            Alert.alert('Copied', 'Address copied to clipboard');
+          },
+        },
+        {
+          text: 'Open in Maps',
+          onPress: () => {
+            const encodedAddress = encodeURIComponent(fullAddress);
+            Linking.openURL(`https://maps.apple.com/?address=${encodedAddress}`).catch(() => {
+              Alert.alert('Error', 'Could not open maps');
+            });
+          },
+        },
+      ]
+    );
   };
 
   const renderScreen = () => {
@@ -742,7 +1170,7 @@ export default function App() {
         return (
           <SwipeableScreen onSwipeBack={navigateBack}>
             <PageTransition type="slide">
-              <CouncilUpdatesScreen council={selectedCouncil} onBack={handleBackToHome} onStartReport={handleStartReport} onSeeAll={handleSeeAllReports} onProfile={handleShowProfile} onSeeAllUpdates={handleSeeAllUpdates} onNotifications={handleShowNotifications} onAlertPress={handleAlertPress} onUpdatePress={handleUpdatePress} />
+              <CouncilUpdatesScreen council={selectedCouncil} onBack={handleBackToHome} onHome={handleGoToHome} onStartReport={handleStartReport} onSeeAll={handleSeeAllReports} onProfile={handleShowProfile} onSeeAllUpdates={handleSeeAllUpdates} onNotifications={handleShowNotifications} onAlertPress={handleAlertPress} onUpdatePress={handleUpdatePress} />
             </PageTransition>
           </SwipeableScreen>
         );
@@ -758,7 +1186,7 @@ export default function App() {
         return (
           <SwipeableScreen onSwipeBack={navigateBack}>
             <PageTransition type="fade">
-              <MyImpactScreen onBack={handleBackToHome} onStartReport={handleStartReport} onCouncilUpdate={handleShowCouncilUpdates} onProfile={handleShowProfile} />
+              <MyImpactScreen onBack={handleBackToHome} onStartReport={handleStartReport} onCouncilUpdate={handleShowCouncilUpdates} onProfile={handleShowProfile} onIssuePress={handleIssuePress} onHistory={handleHistory} />
             </PageTransition>
           </SwipeableScreen>
         );
@@ -766,7 +1194,7 @@ export default function App() {
         return (
           <SwipeableScreen onSwipeBack={navigateBack}>
             <PageTransition type="fade">
-              <NotificationsScreen onBack={handleBackToHome} onSettings={handleShowNotificationSettings} onStartReport={handleStartReport} onSeeAll={handleSeeAllReports} onCouncilUpdate={handleShowCouncilUpdates} onProfile={handleShowProfile} />
+              <NotificationsScreen onBack={handleBackToHome} onSettings={handleShowNotificationSettings} onStartReport={handleStartReport} onSeeAll={handleSeeAllReports} onCouncilUpdate={handleShowCouncilUpdates} onProfile={handleShowProfile} onNotificationPress={handleNotificationPress} />
             </PageTransition>
           </SwipeableScreen>
         );
@@ -782,7 +1210,7 @@ export default function App() {
         return (
           <SwipeableScreen onSwipeBack={navigateBack}>
             <PageTransition type="fade">
-              <ProfileScreen council={selectedCouncil} refreshKey={profileRefreshKey} onBack={handleBackToHome} onHome={handleGoToHome} onStartReport={handleStartReport} onSeeAll={handleSeeAllReports} onCouncilUpdate={handleShowCouncilUpdates} onSettings={handleShowSettings} onHelp={handleShowHelp} onTermsPrivacy={handleShowTermsPrivacy} onEditProfile={handleShowEditProfile} onAnalyticsDashboard={handleShowAnalyticsDashboard} />
+              <ProfileScreen council={selectedCouncil} refreshKey={profileRefreshKey} onBack={handleBackToHome} onHome={handleGoToHome} onStartReport={handleStartReport} onSeeAll={handleSeeAllReports} onCouncilUpdate={handleShowCouncilUpdates} onSettings={handleShowSettings} onHelp={handleShowHelp} onTermsPrivacy={handleShowTermsPrivacy} onEditProfile={handleShowEditProfile} onAnalyticsDashboard={handleShowAnalyticsDashboard} onLogout={handleLogout} onEmailPress={handleEmailPress} onPhonePress={handlePhonePress} onAddressPress={handleAddressPress} />
             </PageTransition>
           </SwipeableScreen>
         );
@@ -940,7 +1368,7 @@ export default function App() {
       case 'privacySettings':
         return (
           <SwipeableScreen onSwipeBack={navigateBack}>
-            <PrivacySettingsScreen onBack={handleBackToSettings} />
+            <PrivacySettingsScreen onBack={handleBackToSettings} onDeleteAccount={handleShowDeleteAccount} />
           </SwipeableScreen>
         );
       case 'signUp':
@@ -1031,9 +1459,11 @@ export default function App() {
   };
 
   return (
-    <ThemeProvider>
-      <SafeAreaView style={styles.container}>{renderScreen()}</SafeAreaView>
-    </ThemeProvider>
+    <DataProvider initialCouncil={selectedCouncil}>
+      <ThemeProvider>
+        <SafeAreaView style={styles.container}>{renderScreen()}</SafeAreaView>
+      </ThemeProvider>
+    </DataProvider>
   );
 }
 

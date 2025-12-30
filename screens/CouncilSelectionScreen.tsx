@@ -18,7 +18,7 @@ import { CouncilsService, LocationService, PostcodesService } from '../services'
 import type { Council } from '../services';
 
 const { width, height } = Dimensions.get('window');
-const HEADER_HEIGHT = height * 0.4;
+const HEADER_HEIGHT = height * 0.28;
 
 interface CouncilSelectionScreenProps {
   onBack?: () => void;
@@ -335,7 +335,7 @@ const CouncilSelectionScreen: React.FC<CouncilSelectionScreenProps> = ({
 
             {/* Location Pin */}
             <View style={styles.locationPin}>
-              <MaterialIcons name="location-on" size={72} color="#EF4444" />
+              <MaterialIcons name="location-on" size={52} color="#EF4444" />
             </View>
 
             {/* Pulsing Ring */}
@@ -583,10 +583,10 @@ const styles = StyleSheet.create({
     bottom: -1,
     left: 0,
     right: 0,
-    height: 100,
+    height: 50,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
     zIndex: 10,
   },
 
@@ -599,13 +599,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 32,
+    paddingBottom: 0,
     zIndex: 5,
   },
   locationCircle: {
-    width: 192,
-    height: 192,
-    borderRadius: 96,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
   gridPattern: {
     position: 'absolute',
     inset: 8,
-    borderRadius: 88,
+    borderRadius: 62,
     opacity: 0.3,
     backgroundColor: '#F3F4F6',
   },
@@ -632,9 +632,9 @@ const styles = StyleSheet.create({
   },
   pulseRing: {
     position: 'absolute',
-    width: 192,
-    height: 192,
-    borderRadius: 96,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     borderWidth: 2,
     borderColor: '#3B82F6',
   },
@@ -674,12 +674,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 32,
+    paddingTop: 0,
     paddingBottom: 32,
     zIndex: 20,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   title: {
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),
@@ -699,7 +700,7 @@ const styles = StyleSheet.create({
   // Search Input
   searchContainer: {
     position: 'relative',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   searchIcon: {
     position: 'absolute',

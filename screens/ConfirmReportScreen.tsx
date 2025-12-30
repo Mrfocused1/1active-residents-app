@@ -10,6 +10,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../services/api.service';
 
 interface ReportData {
@@ -52,9 +53,9 @@ const ConfirmReportScreen: React.FC<ConfirmReportScreenProps> = ({
   onEdit,
   onConfirm,
 }) => {
-  const [userName, setUserName] = useState('User');
-  const [userEmail, setUserEmail] = useState('user@example.com');
-  const [userAddress, setUserAddress] = useState('Loading address...');
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [userAddress, setUserAddress] = useState('');
 
   useEffect(() => {
     fetchUserData();
@@ -62,10 +63,17 @@ const ConfirmReportScreen: React.FC<ConfirmReportScreenProps> = ({
 
   const fetchUserData = async () => {
     try {
+      // Check for auth token first
+      const token = await AsyncStorage.getItem('@active_residents_token');
+      if (!token) {
+        console.log('📝 No auth token, using default user data');
+        return;
+      }
+
       const response = await ApiService.getCurrentUser();
       if (response.data) {
         setUserName(response.data.name || 'User');
-        setUserEmail(response.data.email || 'user@example.com');
+        setUserEmail(response.data.email || '');
 
         // Format user address from profile
         const address = response.data.address;
@@ -81,7 +89,7 @@ const ConfirmReportScreen: React.FC<ConfirmReportScreenProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.log('📝 Could not fetch user data (user may not be logged in)');
     }
   };
 

@@ -7,12 +7,13 @@ import {
   ScrollView,
   TextInput,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface SignUpScreenProps {
   onBack?: () => void;
-  onSignUp?: (data: { fullName: string; email: string; password: string }) => void;
+  onSignUp?: (data: { fullName: string; email: string; password: string }) => Promise<void> | void;
   onLogin?: () => void;
 }
 
@@ -27,6 +28,24 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Track if user has started typing to enable secureTextEntry after first character
+  const [passwordStartedTyping, setPasswordStartedTyping] = useState(false);
+  const [confirmStartedTyping, setConfirmStartedTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handlePasswordChange = (text: string) => {
+    if (text.length > 0 && !passwordStartedTyping) {
+      setPasswordStartedTyping(true);
+    }
+    setPassword(text);
+  };
+
+  const handleConfirmPasswordChange = (text: string) => {
+    if (text.length > 0 && !confirmStartedTyping) {
+      setConfirmStartedTyping(true);
+    }
+    setConfirmPassword(text);
+  };
 
   const canSignUp =
     fullName.trim() &&
@@ -35,9 +54,14 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({
     password === confirmPassword &&
     agreedToTerms;
 
-  const handleSignUp = () => {
-    if (canSignUp) {
-      onSignUp?.({ fullName, email, password });
+  const handleSignUp = async () => {
+    if (canSignUp && !isLoading) {
+      setIsLoading(true);
+      try {
+        await onSignUp?.({ fullName, email, password });
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -107,12 +131,17 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({
               <MaterialIcons name="lock" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 placeholderTextColor="#9CA3AF"
-                secureTextEntry={!showPassword}
+                secureTextEntry={passwordStartedTyping && !showPassword}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={handlePasswordChange}
                 autoCapitalize="none"
+                textContentType="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="default"
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
@@ -126,6 +155,18 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 />
               </TouchableOpacity>
             </View>
+            {password.length > 0 && (
+              <View style={styles.passwordHint}>
+                <MaterialIcons
+                  name={password.length >= 8 ? 'check-circle' : 'info'}
+                  size={14}
+                  color={password.length >= 8 ? '#4DB6AC' : '#9CA3AF'}
+                />
+                <Text style={[styles.passwordHintText, password.length >= 8 && styles.passwordHintSuccess]}>
+                  {password.length >= 8 ? 'Password meets requirements' : `${password.length}/8 characters minimum`}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Confirm Password */}
@@ -135,12 +176,17 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({
               <MaterialIcons name="lock-reset" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="••••••••"
+                placeholder="Re-enter your password"
                 placeholderTextColor="#9CA3AF"
-                secureTextEntry
+                secureTextEntry={confirmStartedTyping}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={handleConfirmPasswordChange}
                 autoCapitalize="none"
+                textContentType="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="default"
               />
             </View>
             {confirmPassword.length > 0 && (
@@ -188,24 +234,30 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({
         <View style={styles.bottomGradient} />
         <View style={styles.bottomContent}>
           <TouchableOpacity
-            style={[styles.signUpButton, !canSignUp && styles.signUpButtonDisabled]}
+            style={[styles.signUpButton, (!canSignUp || isLoading) && styles.signUpButtonDisabled]}
             onPress={handleSignUp}
-            activeOpacity={canSignUp ? 0.8 : 1}
-            disabled={!canSignUp}
+            activeOpacity={canSignUp && !isLoading ? 0.8 : 1}
+            disabled={!canSignUp || isLoading}
           >
-            <Text
-              style={[
-                styles.signUpButtonText,
-                !canSignUp && styles.signUpButtonTextDisabled,
-              ]}
-            >
-              Create Account
-            </Text>
-            <MaterialIcons
-              name="arrow-forward"
-              size={20}
-              color={canSignUp ? '#FFFFFF' : '#9CA3AF'}
-            />
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Text
+                  style={[
+                    styles.signUpButtonText,
+                    !canSignUp && styles.signUpButtonTextDisabled,
+                  ]}
+                >
+                  Create Account
+                </Text>
+                <MaterialIcons
+                  name="arrow-forward"
+                  size={20}
+                  color={canSignUp ? '#FFFFFF' : '#9CA3AF'}
+                />
+              </>
+            )}
           </TouchableOpacity>
 
           <View style={styles.loginContainer}>
@@ -337,6 +389,21 @@ const styles = StyleSheet.create({
   matchTextSuccess: {
     color: '#4DB6AC',
   },
+  passwordHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  passwordHintText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  passwordHintSuccess: {
+    color: '#4DB6AC',
+  },
 
   // Terms
   termsContainer: {
@@ -378,6 +445,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
+    pointerEvents: 'box-none',
   },
   bottomGradient: {
     height: 140,
@@ -388,6 +456,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 32,
     alignItems: 'center',
+    pointerEvents: 'auto',
   },
   signUpButton: {
     flexDirection: 'row',

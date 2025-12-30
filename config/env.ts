@@ -42,7 +42,7 @@ const getEnvConfig = (): EnvConfig => {
     GOOGLE_WEB_CLIENT_ID: extra.GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID || '',
     GOOGLE_CLIENT_SECRET: extra.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '',
     API_BASE_URL: extra.API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:3000/api',
-    USE_MOCK_DATA: extra.USE_MOCK_DATA !== undefined ? extra.USE_MOCK_DATA : true,
+    USE_MOCK_DATA: extra.USE_MOCK_DATA !== undefined ? extra.USE_MOCK_DATA : false,
   };
 };
 

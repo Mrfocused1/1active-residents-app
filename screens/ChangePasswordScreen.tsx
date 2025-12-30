@@ -27,6 +27,30 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentStartedTyping, setCurrentStartedTyping] = useState(false);
+  const [newStartedTyping, setNewStartedTyping] = useState(false);
+  const [confirmStartedTyping, setConfirmStartedTyping] = useState(false);
+
+  const handleCurrentPasswordChange = (text: string) => {
+    if (text.length > 0 && !currentStartedTyping) {
+      setCurrentStartedTyping(true);
+    }
+    setCurrentPassword(text);
+  };
+
+  const handleNewPasswordChange = (text: string) => {
+    if (text.length > 0 && !newStartedTyping) {
+      setNewStartedTyping(true);
+    }
+    setNewPassword(text);
+  };
+
+  const handleConfirmPasswordChange = (text: string) => {
+    if (text.length > 0 && !confirmStartedTyping) {
+      setConfirmStartedTyping(true);
+    }
+    setConfirmPassword(text);
+  };
 
   // Calculate password strength
   const getPasswordStrength = (password: string) => {
@@ -87,10 +111,15 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
               style={styles.input}
               placeholder="Enter current password"
               placeholderTextColor="#9CA3AF"
-              secureTextEntry={!showCurrentPassword}
+              secureTextEntry={currentStartedTyping && !showCurrentPassword}
               value={currentPassword}
-              onChangeText={setCurrentPassword}
+              onChangeText={handleCurrentPasswordChange}
               autoCapitalize="none"
+              textContentType="none"
+              autoComplete="off"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardType="default"
             />
             <TouchableOpacity
               onPress={() => setShowCurrentPassword(!showCurrentPassword)}
@@ -118,10 +147,15 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
               style={styles.input}
               placeholder="Enter new password"
               placeholderTextColor="#9CA3AF"
-              secureTextEntry={!showNewPassword}
+              secureTextEntry={newStartedTyping && !showNewPassword}
               value={newPassword}
-              onChangeText={setNewPassword}
+              onChangeText={handleNewPasswordChange}
               autoCapitalize="none"
+              textContentType="none"
+              autoComplete="off"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardType="default"
             />
             <TouchableOpacity
               onPress={() => setShowNewPassword(!showNewPassword)}
@@ -166,10 +200,15 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
               style={styles.input}
               placeholder="Re-enter new password"
               placeholderTextColor="#9CA3AF"
-              secureTextEntry={!showConfirmPassword}
+              secureTextEntry={confirmStartedTyping && !showConfirmPassword}
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={handleConfirmPasswordChange}
               autoCapitalize="none"
+              textContentType="none"
+              autoComplete="off"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardType="default"
             />
             <TouchableOpacity
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}

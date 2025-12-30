@@ -8,11 +8,15 @@ import {
   Platform,
   Switch,
   Modal,
+  Alert,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme, ThemeMode } from '../contexts/ThemeContext';
 import councilsDatabaseService from '../services/councilsDatabase.service';
+import pushNotifications from '../services/pushNotifications.service';
 
 interface SettingsScreenProps {
   onBack?: () => void;
@@ -48,18 +52,95 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onCouncilChange,
 }) => {
   const { theme, themeMode, setThemeMode } = useTheme();
-  const [pushNotifications, setPushNotifications] = useState(true);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(true);
+  const [isTogglingPush, setIsTogglingPush] = useState(false);
   const [emailUpdates, setEmailUpdates] = useState(false);
+  const [isTogglingEmail, setIsTogglingEmail] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [currentCouncil, setCurrentCouncil] = useState('Camden');
   const [showCouncilModal, setShowCouncilModal] = useState(false);
   const [availableCouncils, setAvailableCouncils] = useState<string[]>([]);
 
-  // Load council preference and available councils on mount
+  // Load preferences on mount
   useEffect(() => {
     loadCouncilPreference();
     loadAvailableCouncils();
+    loadNotificationPreferences();
   }, []);
+
+  const loadNotificationPreferences = async () => {
+    try {
+      // Load push notification preference
+      const pushPref = await AsyncStorage.getItem('@push_notifications_enabled');
+      const { status } = await Notifications.getPermissionsAsync();
+
+      if (status !== 'granted') {
+        setPushNotificationsEnabled(false);
+      } else if (pushPref !== null) {
+        setPushNotificationsEnabled(pushPref === 'true');
+      }
+
+      // Load email updates preference
+      const emailPref = await AsyncStorage.getItem('@email_updates_enabled');
+      if (emailPref !== null) {
+        setEmailUpdates(emailPref === 'true');
+      }
+    } catch (error) {
+      console.error('Error loading notification preferences:', error);
+    }
+  };
+
+  const handlePushNotificationToggle = async (value: boolean) => {
+    setIsTogglingPush(true);
+    try {
+      if (value) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+
+          if (status !== 'granted') {
+            Alert.alert(
+              'Permission Required',
+              'To receive push notifications, please enable them in your device settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ]
+            );
+            setIsTogglingPush(false);
+            return;
+          }
+        }
+
+        await AsyncStorage.setItem('@push_notifications_enabled', 'true');
+        setPushNotificationsEnabled(true);
+        await pushNotifications.registerForPushNotifications();
+      } else {
+        await AsyncStorage.setItem('@push_notifications_enabled', 'false');
+        setPushNotificationsEnabled(false);
+      }
+    } catch (error) {
+      console.error('Error toggling push notifications:', error);
+      Alert.alert('Error', 'Could not update notification settings.');
+    } finally {
+      setIsTogglingPush(false);
+    }
+  };
+
+  const handleEmailUpdatesToggle = async (value: boolean) => {
+    setIsTogglingEmail(true);
+    try {
+      await AsyncStorage.setItem('@email_updates_enabled', value ? 'true' : 'false');
+      setEmailUpdates(value);
+      // In production, this would also call an API to update email preferences on the backend
+    } catch (error) {
+      console.error('Error toggling email updates:', error);
+      Alert.alert('Error', 'Could not update email settings.');
+    } finally {
+      setIsTogglingEmail(false);
+    }
+  };
 
   const loadCouncilPreference = async () => {
     try {
@@ -228,8 +309,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Text style={styles.toggleText}>Push Notifications</Text>
               </View>
               <Switch
-                value={pushNotifications}
-                onValueChange={setPushNotifications}
+                value={pushNotificationsEnabled}
+                onValueChange={handlePushNotificationToggle}
+                disabled={isTogglingPush}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -247,7 +329,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </View>
               <Switch
                 value={emailUpdates}
-                onValueChange={setEmailUpdates}
+                onValueChange={handleEmailUpdatesToggle}
+                disabled={isTogglingEmail}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"

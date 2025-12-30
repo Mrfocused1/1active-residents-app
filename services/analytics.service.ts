@@ -109,6 +109,27 @@ class AnalyticsService {
   }
 
   /**
+   * Enable tracking (alias for setEnabled(true))
+   */
+  enableTracking(): void {
+    this.setEnabled(true);
+  }
+
+  /**
+   * Disable tracking (alias for setEnabled(false))
+   */
+  disableTracking(): void {
+    this.setEnabled(false);
+  }
+
+  /**
+   * Set analytics enabled state (alias for setEnabled)
+   */
+  setAnalyticsEnabled(enabled: boolean): void {
+    this.setEnabled(enabled);
+  }
+
+  /**
    * Get recent events (for debugging)
    */
   getRecentEvents(limit: number = 10): AnalyticsEvent[] {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,20 +7,182 @@ import {
   ScrollView,
   Platform,
   Switch,
+  Alert,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import analytics from '../services/analytics.service';
 
 interface PrivacySettingsScreenProps {
   onBack?: () => void;
+  onDeleteAccount?: () => void;
 }
 
-const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack }) => {
+const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack, onDeleteAccount }) => {
   const [dataTracking, setDataTracking] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [profileVisibility, setProfileVisibility] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
   const [usageAnalytics, setUsageAnalytics] = useState(true);
   const [crashReports, setCrashReports] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load saved preferences on mount
+  useEffect(() => {
+    loadPrivacySettings();
+  }, []);
+
+  const loadPrivacySettings = async () => {
+    try {
+      const settings = await AsyncStorage.getItem('@privacy_settings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        setDataTracking(parsed.dataTracking ?? false);
+        setUsageAnalytics(parsed.usageAnalytics ?? true);
+        setCrashReports(parsed.crashReports ?? true);
+        setProfileVisibility(parsed.profileVisibility ?? true);
+        setMarketingEmails(parsed.marketingEmails ?? false);
+      }
+
+      // Check actual location permission status
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setLocationServices(status === 'granted');
+    } catch (error) {
+      console.error('Error loading privacy settings:', error);
+    }
+  };
+
+  const savePrivacySettings = async (updates: Partial<{
+    dataTracking: boolean;
+    usageAnalytics: boolean;
+    crashReports: boolean;
+    profileVisibility: boolean;
+    marketingEmails: boolean;
+  }>) => {
+    try {
+      const current = await AsyncStorage.getItem('@privacy_settings');
+      const settings = current ? JSON.parse(current) : {};
+      const updated = { ...settings, ...updates };
+      await AsyncStorage.setItem('@privacy_settings', JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error saving privacy settings:', error);
+    }
+  };
+
+  const handleDataTrackingToggle = async (value: boolean) => {
+    setDataTracking(value);
+    await savePrivacySettings({ dataTracking: value });
+
+    // Update analytics service
+    if (value) {
+      analytics.enableTracking();
+    } else {
+      analytics.disableTracking();
+    }
+  };
+
+  const handleUsageAnalyticsToggle = async (value: boolean) => {
+    setUsageAnalytics(value);
+    await savePrivacySettings({ usageAnalytics: value });
+
+    // Update analytics service
+    analytics.setAnalyticsEnabled(value);
+  };
+
+  const handleCrashReportsToggle = async (value: boolean) => {
+    setCrashReports(value);
+    await savePrivacySettings({ crashReports: value });
+
+    // In production, this would toggle crash reporting (e.g., Sentry, Crashlytics)
+    console.log('Crash reports:', value ? 'enabled' : 'disabled');
+  };
+
+  const handleLocationServicesToggle = async (value: boolean) => {
+    if (value) {
+      // Request location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Location access is required for accurate issue reporting. Please enable it in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+      setLocationServices(true);
+    } else {
+      // Can't revoke permission programmatically, but inform user
+      Alert.alert(
+        'Disable Location',
+        'To disable location services, please go to your device Settings > Privacy > Location Services.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+    }
+  };
+
+  const handleProfileVisibilityToggle = async (value: boolean) => {
+    setProfileVisibility(value);
+    await savePrivacySettings({ profileVisibility: value });
+    // In production, this would update the backend
+  };
+
+  const handleMarketingEmailsToggle = async (value: boolean) => {
+    setMarketingEmails(value);
+    await savePrivacySettings({ marketingEmails: value });
+    // In production, this would update email preferences on the backend
+  };
+
+  const handleDownloadData = () => {
+    Alert.alert(
+      'Download Your Data',
+      'We will prepare a copy of your data and send it to your registered email address within 48 hours.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Request Download',
+          onPress: async () => {
+            setIsLoading(true);
+            // In production, this would call an API endpoint
+            setTimeout(() => {
+              setIsLoading(false);
+              Alert.alert('Request Submitted', 'You will receive an email with your data within 48 hours.');
+            }, 1500);
+          }
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAllData = () => {
+    Alert.alert(
+      'Delete All Data',
+      'This will permanently delete all your data including reports, preferences, and account information. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: () => {
+            // Navigate to delete account screen for confirmation
+            if (onDeleteAccount) {
+              onDeleteAccount();
+            } else {
+              Alert.alert('Delete Account', 'Please go to Settings > Delete Account to complete this action.');
+            }
+          }
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -71,7 +233,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
               </View>
               <Switch
                 value={dataTracking}
-                onValueChange={setDataTracking}
+                onValueChange={handleDataTrackingToggle}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -94,7 +256,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
               </View>
               <Switch
                 value={usageAnalytics}
-                onValueChange={setUsageAnalytics}
+                onValueChange={handleUsageAnalyticsToggle}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -117,7 +279,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
               </View>
               <Switch
                 value={crashReports}
-                onValueChange={setCrashReports}
+                onValueChange={handleCrashReportsToggle}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -150,7 +312,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
               </View>
               <Switch
                 value={locationServices}
-                onValueChange={setLocationServices}
+                onValueChange={handleLocationServicesToggle}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -173,7 +335,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
               </View>
               <Switch
                 value={profileVisibility}
-                onValueChange={setProfileVisibility}
+                onValueChange={handleProfileVisibilityToggle}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -206,7 +368,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
               </View>
               <Switch
                 value={marketingEmails}
-                onValueChange={setMarketingEmails}
+                onValueChange={handleMarketingEmailsToggle}
                 trackColor={{ false: '#D1D5DB', true: '#5B7CFA' }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -233,7 +395,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Data Management</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.actionItem} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.actionItem} activeOpacity={0.8} onPress={handleDownloadData}>
               <View style={styles.actionLeft}>
                 <MaterialIcons name="download" size={20} color="#5B7CFA" />
                 <Text style={styles.actionText}>Download My Data</Text>
@@ -243,7 +405,7 @@ const PrivacySettingsScreen: React.FC<PrivacySettingsScreenProps> = ({ onBack })
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.actionItem} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.actionItem} activeOpacity={0.8} onPress={handleDeleteAllData}>
               <View style={styles.actionLeft}>
                 <MaterialIcons name="delete-outline" size={20} color="#EF4444" />
                 <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete All My Data</Text>

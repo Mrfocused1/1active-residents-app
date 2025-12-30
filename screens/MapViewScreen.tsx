@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,11 +15,13 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import {
-  getRecentReports,
   getStatusLabel,
   getStatusColor,
   FixMyStreetReport,
 } from '../services/fixmystreet.service';
+import { cleanReportTitle, getShortSummary } from '../utils/titleUtils';
+import { useRecentReports } from '../hooks/useRecentReports';
+import { RefreshButton } from '../components/RefreshButton';
 
 const { width, height } = Dimensions.get('window');
 
@@ -92,13 +94,26 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
   const [selectedFilter, setSelectedFilter] = useState('All Issues');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIssue, setSelectedIssue] = useState<IssueMarker | null>(null);
-  const [issues, setIssues] = useState<IssueMarker[]>([]);
-  const [loading, setLoading] = useState(mode === 'view'); // Don't load in selectLocation mode
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(
     initialLocation || null
   );
   const [selectedAddress, setSelectedAddress] = useState<{ address: string; city: string } | null>(null);
   const [isGeocodingAddress, setIsGeocodingAddress] = useState(false);
+  const [markersReady, setMarkersReady] = useState(false);
+
+  // Map filter to API status
+  const statusFilter = useMemo(() => {
+    if (selectedFilter === 'Open') return 'open';
+    if (selectedFilter === 'Fixed') return 'closed';
+    if (selectedFilter === 'In Progress') return 'investigating';
+    return undefined;
+  }, [selectedFilter]);
+
+  // Use cached reports (only in view mode)
+  const { reports: rawReports, loading, lastUpdated, refresh } = useRecentReports(
+    mode === 'view' ? council : '',
+    { status: statusFilter, limit: 100 }
+  );
 
   // Get council coordinates or use default (Camden)
   const getCouncilCoordinates = () => {
@@ -106,11 +121,29 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
     return coords || COUNCIL_COORDINATES['Camden'];
   };
 
+  const getMarkerType = (category: string): 'pothole' | 'bench' | 'lamp' | 'flooding' => {
+    if (category.toLowerCase().includes('pothole') || category.toLowerCase().includes('road')) return 'pothole';
+    if (category.toLowerCase().includes('light')) return 'lamp';
+    if (category.toLowerCase().includes('flood') || category.toLowerCase().includes('water')) return 'flooding';
+    return 'bench';
+  };
+
+  const getMarkerIcon = (category: string, status: string): string => {
+    if (status === 'closed' || status === 'fixed') return 'check-circle';
+    if (category.toLowerCase().includes('pothole')) return 'warning';
+    if (category.toLowerCase().includes('light')) return 'lightbulb';
+    if (category.toLowerCase().includes('flood')) return 'water-drop';
+    if (category.toLowerCase().includes('tree')) return 'park';
+    if (category.toLowerCase().includes('bin')) return 'delete';
+    return 'location-on';
+  };
+
   const [initialRegion, setInitialRegion] = useState({
     ...getCouncilCoordinates(),
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+  const [currentRegion, setCurrentRegion] = useState(initialRegion);
 
   const filters = ['All Issues', 'Open', 'Fixed', 'In Progress'];
 
@@ -132,83 +165,40 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
     }
   }, [council]);
 
+  // Transform raw reports to map markers
+  const issues = useMemo(() => {
+    if (!rawReports || rawReports.length === 0) return [];
+
+    return rawReports
+      .filter((report: any) => report.lat && report.long)
+      .map((report: any) => ({
+        id: report.id,
+        title: cleanReportTitle(report.title) || report.service_name || 'Reported Issue',
+        location: getShortSummary(report.description, 50) || report.service_name || 'Location not specified',
+        distance: '',
+        status: getStatusLabel(report.status) as any,
+        statusColor: getStatusColor(report.status),
+        coordinate: {
+          latitude: parseFloat(report.lat),
+          longitude: parseFloat(report.long),
+        },
+        type: getMarkerType(report.service_code || ''),
+        icon: getMarkerIcon(report.service_code || '', report.status),
+        iconColor: getStatusColor(report.status),
+        image: report.media_url || null,
+        reporters: report.comment_count || 1,
+        rawData: report,
+      }));
+  }, [rawReports]);
+
+  // Reset markersReady when issues change, then set to true after delay for iOS rendering
   useEffect(() => {
-    // Only load reports in 'view' mode
-    if (mode === 'view') {
-      loadReports();
+    if (issues.length > 0) {
+      setMarkersReady(false);
+      const timer = setTimeout(() => setMarkersReady(true), 500);
+      return () => clearTimeout(timer);
     }
-  }, [council, selectedFilter, mode]);
-
-  const loadReports = async () => {
-    try {
-      setLoading(true);
-
-      // Map filter to API status
-      let statusFilter: string | undefined;
-      if (selectedFilter === 'Open') statusFilter = 'open';
-      else if (selectedFilter === 'Fixed') statusFilter = 'closed';
-      else if (selectedFilter === 'In Progress') statusFilter = 'investigating';
-
-      const reports = await getRecentReports(council, statusFilter, 100);
-
-      // Transform to map markers
-      const markers: IssueMarker[] = reports
-        .filter(report => report.lat && report.long) // Only include reports with coordinates
-        .map((report: FixMyStreetReport) => ({
-          id: report.service_request_id.toString(),
-          title: report.title || report.service_name,
-          location: report.title || 'Location not specified',
-          distance: '', // Could calculate distance from user location
-          status: getStatusLabel(report.status) as any,
-          statusColor: getStatusColor(report.status),
-          coordinate: {
-            latitude: parseFloat(report.lat),
-            longitude: parseFloat(report.long),
-          },
-          type: getMarkerType(report.service_code),
-          icon: getMarkerIcon(report.service_code, report.status),
-          iconColor: getStatusColor(report.status),
-          image: report.media_url,
-          reporters: report.comment_count || 1,
-          rawData: report, // Store original data
-        }));
-
-      setIssues(markers);
-
-      // Set initial region to center of reports if available
-      if (markers.length > 0) {
-        const avgLat = markers.reduce((sum, m) => sum + m.coordinate.latitude, 0) / markers.length;
-        const avgLong = markers.reduce((sum, m) => sum + m.coordinate.longitude, 0) / markers.length;
-        setInitialRegion({
-          latitude: avgLat,
-          longitude: avgLong,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading map reports:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getMarkerType = (category: string): 'pothole' | 'bench' | 'lamp' | 'flooding' => {
-    if (category.toLowerCase().includes('pothole') || category.toLowerCase().includes('road')) return 'pothole';
-    if (category.toLowerCase().includes('light')) return 'lamp';
-    if (category.toLowerCase().includes('flood') || category.toLowerCase().includes('water')) return 'flooding';
-    return 'bench';
-  };
-
-  const getMarkerIcon = (category: string, status: string): string => {
-    if (status === 'closed' || status === 'fixed') return 'check-circle';
-    if (category.toLowerCase().includes('pothole')) return 'warning';
-    if (category.toLowerCase().includes('light')) return 'lightbulb';
-    if (category.toLowerCase().includes('flood')) return 'water-drop';
-    if (category.toLowerCase().includes('tree')) return 'park';
-    if (category.toLowerCase().includes('bin')) return 'delete';
-    return 'location-on';
-  };
+  }, [issues.length]);
 
   const mockIssues: IssueMarker[] = [
     {
@@ -290,15 +280,31 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
   };
 
   const handleMyLocation = () => {
-    mapRef.current?.animateToRegion(initialRegion);
+    mapRef.current?.animateToRegion(initialRegion, 300);
   };
 
   const handleZoomIn = () => {
-    // Zoom in logic would go here
+    const newRegion = {
+      ...currentRegion,
+      latitudeDelta: currentRegion.latitudeDelta / 2,
+      longitudeDelta: currentRegion.longitudeDelta / 2,
+    };
+    setCurrentRegion(newRegion);
+    mapRef.current?.animateToRegion(newRegion, 300);
   };
 
   const handleZoomOut = () => {
-    // Zoom out logic would go here
+    const newRegion = {
+      ...currentRegion,
+      latitudeDelta: Math.min(currentRegion.latitudeDelta * 2, 180),
+      longitudeDelta: Math.min(currentRegion.longitudeDelta * 2, 360),
+    };
+    setCurrentRegion(newRegion);
+    mapRef.current?.animateToRegion(newRegion, 300);
+  };
+
+  const handleRegionChange = (region: any) => {
+    setCurrentRegion(region);
   };
 
   const reverseGeocodeLocation = async (latitude: number, longitude: number) => {
@@ -331,10 +337,19 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
   };
 
   const handleMapPress = async (event: any) => {
+    // Don't handle if the press was on a marker (action will be 'marker-press')
+    const action = event.nativeEvent?.action;
+    if (action === 'marker-press') {
+      return;
+    }
+
     if (mode === 'selectLocation') {
       const { latitude, longitude } = event.nativeEvent.coordinate;
       setSelectedLocation({ latitude, longitude });
       await reverseGeocodeLocation(latitude, longitude);
+    } else if (mode === 'view') {
+      // Close the popup when tapping on the map (not on a marker)
+      setSelectedIssue(null);
     }
   };
 
@@ -379,13 +394,15 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
         showsUserLocation
         showsMyLocationButton={false}
         onPress={handleMapPress}
+        onRegionChangeComplete={handleRegionChange}
       >
         {/* Show issue markers only in 'view' mode */}
-        {mode === 'view' && !loading && filteredIssues.map((issue) => (
+        {mode === 'view' && !loading && filteredIssues.map((issue, index) => (
           <Marker
-            key={issue.id}
+            key={`${issue.id}-${index}`}
             coordinate={issue.coordinate}
             onPress={() => handleMarkerPress(issue)}
+            tracksViewChanges={!markersReady || issue.id === selectedIssue?.id}
           >
             <View style={styles.markerContainer}>
               <View
@@ -444,6 +461,15 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
               <MaterialIcons name="tune" size={20} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
+
+          {mode === 'view' && (
+            <RefreshButton
+              lastUpdated={lastUpdated}
+              isRefreshing={loading}
+              onRefresh={refresh}
+              compact
+            />
+          )}
         </View>
 
         {mode === 'view' && (
@@ -544,6 +570,14 @@ const MapViewScreen: React.FC<MapViewScreenProps> = ({
       {/* Bottom Sheet - Issue Details (view mode only) */}
       {mode === 'view' && selectedIssue && (
         <View style={styles.bottomSheet}>
+          {/* Close Button */}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setSelectedIssue(null)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="close" size={20} color="#6B7280" />
+          </TouchableOpacity>
           <View style={styles.issueCard}>
             <View style={styles.issueContent}>
               <TouchableOpacity style={styles.issueImage} activeOpacity={0.8} onPress={() => onImagePreview?.(selectedIssue.id)}>
@@ -826,6 +860,23 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 20,
     paddingBottom: 32,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: -40,
+    right: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 10,
   },
   issueCard: {
     backgroundColor: '#FFFFFF',

@@ -67,13 +67,15 @@ class PushNotificationsService {
     }
 
     try {
-      // Check if we have a valid project ID (skip in development without real Expo project)
+      // Get project ID from config
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      if (!projectId || projectId === 'b47e3f2a-8c9d-4e1f-a6b2-3d5c8f9e1a7b') {
-        console.warn('Push notifications disabled: No valid Expo project ID configured');
-        console.info('To enable push notifications, create an Expo project at https://expo.dev and add the projectId to app.json');
+      if (!projectId) {
+        console.warn('Push notifications disabled: No Expo project ID configured');
+        console.info('To enable push notifications, run "eas init" or create a project at https://expo.dev');
         return null;
       }
+
+      console.log('📬 Using Expo project ID:', projectId);
 
       // Check existing permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();

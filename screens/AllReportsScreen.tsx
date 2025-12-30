@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,11 @@ import {
   getStatusLabel,
   getStatusColor,
 } from '../services/fixmystreet.service';
-import { getCouncilData, AggregatedReport } from '../services/dataAggregator.service';
+import { AggregatedReport } from '../services/dataAggregator.service';
 import apiService from '../services/api.service';
+import { cleanReportTitle, getShortSummary } from '../utils/titleUtils';
+import { useCouncilData } from '../hooks/useCouncilData';
+import { RefreshButton } from '../components/RefreshButton';
 
 interface AllReportsScreenProps {
   council?: string;
@@ -50,11 +53,21 @@ const AllReportsScreen: React.FC<AllReportsScreenProps> = ({
   onLoadMore
 }) => {
   const [selectedFilter, setSelectedFilter] = useState('All');
-  const [allReports, setAllReports] = useState<any[]>([]);
-  const [sortedReports, setSortedReports] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [myReportsData, setMyReportsData] = useState<any[]>([]);
+  const [myReportsLoading, setMyReportsLoading] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [showSortModal, setShowSortModal] = useState(false);
+
+  // Use cached council data (only when not showing personal reports)
+  const { data: councilData, loading: councilLoading, lastUpdated, refresh } = useCouncilData(
+    showMyReports ? '' : council,
+    {
+      includeReports: true,
+      includeNews: false,
+      includeUpdates: false,
+      maxReports: 50,
+    }
+  );
 
   const filters = ['All', 'Open', 'Fixed', 'In Progress'];
 
@@ -65,108 +78,30 @@ const AllReportsScreen: React.FC<AllReportsScreenProps> = ({
     { value: 'location' as SortOption, label: 'Location', icon: 'place' },
   ];
 
+  // Load personal reports when in showMyReports mode
   useEffect(() => {
-    loadReports();
-  }, [council, selectedFilter]);
-
-  // Sort reports whenever sort option or reports change
-  useEffect(() => {
-    sortReports();
-  }, [allReports, sortOption]);
-
-  const sortReports = () => {
-    const sorted = [...allReports].sort((a, b) => {
-      switch (sortOption) {
-        case 'newest':
-          // Most recent first (assuming they have timestamps)
-          return 0; // Already sorted by API
-        case 'oldest':
-          // Oldest first
-          return 0; // Reverse of newest
-        case 'status':
-          // Alphabetical by status
-          return a.status.localeCompare(b.status);
-        case 'location':
-          // Alphabetical by location
-          return a.location.localeCompare(b.location);
-        default:
-          return 0;
-      }
-    });
-
-    if (sortOption === 'oldest') {
-      sorted.reverse();
+    if (showMyReports) {
+      loadMyReports();
     }
+  }, [showMyReports]);
 
-    setSortedReports(sorted);
-  };
-
-  const handleSortSelect = (option: SortOption) => {
-    setSortOption(option);
-    setShowSortModal(false);
-  };
-
-  const getSortLabel = (): string => {
-    const option = sortOptions.find(opt => opt.value === sortOption);
-    return option?.label || 'Newest First';
-  };
-
-  const loadReports = async () => {
+  const loadMyReports = async () => {
     try {
-      setLoading(true);
-
-      let transformedReports: any[] = [];
-
-      if (showMyReports) {
-        // Fetch user's personal reports from API
-        const response = await apiService.getReports({ myReports: true });
-        transformedReports = (response.data || []).map((report: any) => ({
-          id: report.id,
-          title: report.title,
-          category: report.category,
-          status: report.status || 'open',
-          date: report.createdAt,
-          location: report.location,
-        }));
-      } else {
-        // Fetch comprehensive council data from all 5 APIs
-        const data = await getCouncilData(council, {
-          includeReports: true,
-          includeNews: false,
-          includeUpdates: false,
-          maxReports: 50,
-        });
-
-        // Transform to UI format
-        transformedReports = data.reports.map((report: AggregatedReport) => ({
-          id: report.id,
-          title: report.title,
-          location: report.description || report.title,
-          time: formatReportTime(report.date),
-          status: getStatusLabel(report.status),
-          statusColor: getStatusColor(report.status),
-          borderColor: getStatusColor(report.status),
-          hasImage: false,
-          icon: getIconForCategory(report.category),
-          rawData: report, // Store original data for detail view
-        }));
-      }
-
-      // Apply client-side filtering if needed
-      let filteredReports = transformedReports;
-      if (selectedFilter === 'Open') {
-        filteredReports = transformedReports.filter(r => r.status === 'Received' || r.status === 'In Progress');
-      } else if (selectedFilter === 'Fixed') {
-        filteredReports = transformedReports.filter(r => r.status === 'Fixed' || r.status === 'Closed');
-      } else if (selectedFilter === 'In Progress') {
-        filteredReports = transformedReports.filter(r => r.status === 'In Progress');
-      }
-
-      setAllReports(filteredReports);
+      setMyReportsLoading(true);
+      const response = await apiService.getReports({ myReports: true });
+      const transformedReports = (response.data || []).map((report: any) => ({
+        id: report.id,
+        title: cleanReportTitle(report.title),
+        category: report.category,
+        status: report.status || 'open',
+        date: report.createdAt,
+        location: report.location,
+      }));
+      setMyReportsData(transformedReports);
     } catch (error) {
-      console.warn('Error loading reports:', error);
+      console.warn('Error loading my reports:', error);
     } finally {
-      setLoading(false);
+      setMyReportsLoading(false);
     }
   };
 
@@ -180,6 +115,83 @@ const AllReportsScreen: React.FC<AllReportsScreenProps> = ({
       'Faded': 'edit-road',
     };
     return categoryMap[category] || 'report-problem';
+  };
+
+  // Transform and filter reports
+  const allReports = useMemo(() => {
+    let transformedReports: any[] = [];
+
+    if (showMyReports) {
+      transformedReports = myReportsData;
+    } else if (councilData?.reports) {
+      transformedReports = councilData.reports.map((report: AggregatedReport) => ({
+        id: report.id,
+        title: cleanReportTitle(report.title),
+        location: getShortSummary(report.description, 50) || report.category || 'Location not specified',
+        time: formatReportTime(report.date),
+        status: getStatusLabel(report.status),
+        statusColor: getStatusColor(report.status),
+        borderColor: getStatusColor(report.status),
+        hasImage: false,
+        icon: getIconForCategory(report.category),
+        rawData: report,
+      }));
+    }
+
+    // Apply client-side filtering
+    if (selectedFilter === 'Open') {
+      return transformedReports.filter(r => r.status === 'Received' || r.status === 'In Progress');
+    } else if (selectedFilter === 'Fixed') {
+      return transformedReports.filter(r => r.status === 'Fixed' || r.status === 'Closed');
+    } else if (selectedFilter === 'In Progress') {
+      return transformedReports.filter(r => r.status === 'In Progress');
+    }
+
+    return transformedReports;
+  }, [showMyReports, myReportsData, councilData?.reports, selectedFilter]);
+
+  // Sort reports
+  const sortedReports = useMemo(() => {
+    const sorted = [...allReports].sort((a, b) => {
+      switch (sortOption) {
+        case 'newest':
+          return 0;
+        case 'oldest':
+          return 0;
+        case 'status':
+          return a.status.localeCompare(b.status);
+        case 'location':
+          return a.location.localeCompare(b.location);
+        default:
+          return 0;
+      }
+    });
+
+    if (sortOption === 'oldest') {
+      sorted.reverse();
+    }
+
+    return sorted;
+  }, [allReports, sortOption]);
+
+  const loading = showMyReports ? myReportsLoading : councilLoading;
+
+  const handleSortSelect = (option: SortOption) => {
+    setSortOption(option);
+    setShowSortModal(false);
+  };
+
+  const getSortLabel = (): string => {
+    const option = sortOptions.find(opt => opt.value === sortOption);
+    return option?.label || 'Newest First';
+  };
+
+  const handleRefresh = () => {
+    if (showMyReports) {
+      loadMyReports();
+    } else {
+      refresh();
+    }
   };
 
   const mockReports = [
@@ -255,15 +267,23 @@ const AllReportsScreen: React.FC<AllReportsScreenProps> = ({
               <MaterialIcons name="arrow-back" size={24} color="#64748B" />
             </ScalePress>
             <Text style={styles.headerTitle}>{showMyReports ? 'My Reports' : 'All Recent Reports'}</Text>
-            <ScalePress
-              style={styles.headerButton}
-              onPress={() => {
-                console.log('Map button pressed!');
-                onViewMap?.();
-              }}
-            >
-              <MaterialIcons name="map" size={24} color="#5B7CFA" />
-            </ScalePress>
+            <View style={styles.headerRight}>
+              <RefreshButton
+                lastUpdated={lastUpdated}
+                isRefreshing={loading}
+                onRefresh={handleRefresh}
+                compact
+              />
+              <ScalePress
+                style={styles.headerButton}
+                onPress={() => {
+                  console.log('Map button pressed!');
+                  onViewMap?.();
+                }}
+              >
+                <MaterialIcons name="map" size={24} color="#5B7CFA" />
+              </ScalePress>
+            </View>
           </View>
         </FadeIn>
 
@@ -557,6 +577,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     marginBottom: 24,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 'auto',
   },
   headerButton: {
     width: 40,

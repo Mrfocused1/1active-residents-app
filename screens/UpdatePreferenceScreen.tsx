@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Dimensions,
   Platform,
   PanResponder,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -31,6 +32,46 @@ const UpdatePreferenceScreen: React.FC<UpdatePreferenceScreenProps> = ({
   const sliderRef = useRef<View>(null);
   const sliderDimensions = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const pageXOffset = useRef(0);
+
+  // Animation values for floating cards
+  const floatAnim1 = useRef(new Animated.Value(0)).current;
+  const floatAnim2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Floating animation for main card
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim1, {
+          toValue: -8,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim1, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Delayed floating animation for background cards
+    setTimeout(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(floatAnim2, {
+            toValue: -6,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim2, {
+            toValue: 0,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }, 1500);
+  }, []);
 
   // Get label text based on slider value
   const getPreferenceLabel = (value: number) => {
@@ -115,7 +156,7 @@ const UpdatePreferenceScreen: React.FC<UpdatePreferenceScreenProps> = ({
         {/* Cards Container */}
         <View style={styles.cardsContainer}>
           {/* Main Featured Notification Card */}
-          <View style={styles.mainCardWrapper}>
+          <Animated.View style={[styles.mainCardWrapper, { transform: [{ translateY: floatAnim1 }] }]}>
             <LinearGradient
               colors={['#3B82F6', '#2563EB']}
               start={{ x: 0, y: 0 }}
@@ -144,12 +185,12 @@ const UpdatePreferenceScreen: React.FC<UpdatePreferenceScreenProps> = ({
                 </Text>
               </View>
             </LinearGradient>
-          </View>
+          </Animated.View>
 
           {/* Background Cards */}
           <View style={styles.backgroundCards}>
             {/* Left Card */}
-            <View style={[styles.bgCard, styles.bgCardLeft]}>
+            <Animated.View style={[styles.bgCard, styles.bgCardLeft, { transform: [{ translateY: floatAnim2 }, { scale: 0.95 }, { translateX: -8 }, { rotate: '-2deg' }] }]}>
               <View style={styles.bgCardIconRed}>
                 <MaterialIcons name="warning" size={20} color="#EF4444" />
               </View>
@@ -157,10 +198,10 @@ const UpdatePreferenceScreen: React.FC<UpdatePreferenceScreenProps> = ({
                 <View style={styles.bgCardLine} />
                 <View style={[styles.bgCardLine, styles.bgCardLineShort]} />
               </View>
-            </View>
+            </Animated.View>
 
             {/* Right Card */}
-            <View style={[styles.bgCard, styles.bgCardRight]}>
+            <Animated.View style={[styles.bgCard, styles.bgCardRight, { transform: [{ translateY: floatAnim2 }, { scale: 0.9 }, { translateX: 8 }, { rotate: '1deg' }] }]}>
               <View style={styles.bgCardIconPurple}>
                 <MaterialIcons name="brush" size={20} color="#A855F7" />
               </View>
@@ -168,20 +209,13 @@ const UpdatePreferenceScreen: React.FC<UpdatePreferenceScreenProps> = ({
                 <View style={[styles.bgCardLine, styles.bgCardLineMedium]} />
                 <Text style={styles.bgCardSmallText}>Council notified</Text>
               </View>
-            </View>
+            </Animated.View>
           </View>
         </View>
       </View>
 
       {/* Bottom Section - Content */}
       <View style={styles.bottomSection}>
-        {/* Pagination Dots */}
-        <View style={styles.paginationDots}>
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-          <View style={[styles.dot, styles.dotActive]} />
-        </View>
-
         {/* Title and Description */}
         <View style={styles.textContainer}>
           <Text style={styles.title}>
@@ -237,6 +271,13 @@ const UpdatePreferenceScreen: React.FC<UpdatePreferenceScreenProps> = ({
 
         {/* Buttons */}
         <View style={styles.buttonsContainer}>
+          {/* Pagination Dots */}
+          <View style={styles.paginationDots}>
+            <View style={styles.dot} />
+            <View style={styles.dot} />
+            <View style={[styles.dot, styles.dotActive]} />
+          </View>
+
           <TouchableOpacity style={styles.continueButton} onPress={handleContinue} activeOpacity={0.8}>
             <Text style={styles.continueButtonText}>Continue</Text>
             <MaterialIcons name="arrow-forward" size={18} color="#FFFFFF" />
@@ -306,10 +347,10 @@ const styles = StyleSheet.create({
     bottom: -1,
     left: 0,
     right: 0,
-    height: 100,
+    height: 50,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
   },
 
   // Cards Container
@@ -419,11 +460,9 @@ const styles = StyleSheet.create({
   },
   bgCardLeft: {
     opacity: 0.8,
-    transform: [{ scale: 0.95 }, { translateX: -8 }, { rotate: '-2deg' }],
   },
   bgCardRight: {
     opacity: 0.6,
-    transform: [{ scale: 0.9 }, { translateX: 8 }, { rotate: '1deg' }],
   },
   bgCardIconRed: {
     backgroundColor: '#FEE2E2',
@@ -462,15 +501,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 32,
-    paddingTop: 24,
+    paddingTop: 0,
     paddingBottom: 40,
     alignItems: 'center',
     zIndex: 20,
   },
   paginationDots: {
     flexDirection: 'row',
+    justifyContent: 'center',
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   dot: {
     width: 10,
@@ -510,7 +550,7 @@ const styles = StyleSheet.create({
   // Slider Styles
   sliderContainer: {
     width: '100%',
-    marginTop: 16,
+    marginTop: 48,
     marginBottom: 32,
   },
   sliderLabel: {
@@ -616,6 +656,7 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     width: '100%',
     marginTop: 'auto',
+    alignItems: 'center',
   },
   continueButton: {
     width: '100%',

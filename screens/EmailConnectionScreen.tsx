@@ -139,6 +139,46 @@ const EmailConnectionScreen: React.FC<EmailConnectionScreenProps> = ({ onBack })
     }
   };
 
+  // Auto-save preference handlers
+  const handleAutoSendReportsToggle = async (value: boolean) => {
+    setAutoSendReports(value);
+    try {
+      await emailService.savePreferences({
+        autoSendReports: value,
+        receiveCopies,
+        trackEmails,
+      });
+    } catch (error) {
+      console.error('Error saving preference:', error);
+    }
+  };
+
+  const handleReceiveCopiesToggle = async (value: boolean) => {
+    setReceiveCopies(value);
+    try {
+      await emailService.savePreferences({
+        autoSendReports,
+        receiveCopies: value,
+        trackEmails,
+      });
+    } catch (error) {
+      console.error('Error saving preference:', error);
+    }
+  };
+
+  const handleTrackEmailsToggle = async (value: boolean) => {
+    setTrackEmails(value);
+    try {
+      await emailService.savePreferences({
+        autoSendReports,
+        receiveCopies,
+        trackEmails: value,
+      });
+    } catch (error) {
+      console.error('Error saving preference:', error);
+    }
+  };
+
   const handleTestEmail = async () => {
     try {
       Alert.alert(
@@ -273,7 +313,7 @@ const EmailConnectionScreen: React.FC<EmailConnectionScreenProps> = ({ onBack })
                 </View>
                 <Switch
                   value={autoSendReports}
-                  onValueChange={setAutoSendReports}
+                  onValueChange={handleAutoSendReportsToggle}
                   trackColor={{ false: '#D1D5DB', true: '#A5D6A7' }}
                   thumbColor={autoSendReports ? '#4DB6AC' : '#F3F4F6'}
                   ios_backgroundColor="#D1D5DB"
@@ -294,7 +334,7 @@ const EmailConnectionScreen: React.FC<EmailConnectionScreenProps> = ({ onBack })
                 </View>
                 <Switch
                   value={receiveCopies}
-                  onValueChange={setReceiveCopies}
+                  onValueChange={handleReceiveCopiesToggle}
                   trackColor={{ false: '#D1D5DB', true: '#A5D6A7' }}
                   thumbColor={receiveCopies ? '#4DB6AC' : '#F3F4F6'}
                   ios_backgroundColor="#D1D5DB"
@@ -315,7 +355,7 @@ const EmailConnectionScreen: React.FC<EmailConnectionScreenProps> = ({ onBack })
                 </View>
                 <Switch
                   value={trackEmails}
-                  onValueChange={setTrackEmails}
+                  onValueChange={handleTrackEmailsToggle}
                   trackColor={{ false: '#D1D5DB', true: '#A5D6A7' }}
                   thumbColor={trackEmails ? '#4DB6AC' : '#F3F4F6'}
                   ios_backgroundColor="#D1D5DB"

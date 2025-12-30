@@ -19,9 +19,11 @@ interface MyImpactScreenProps {
   onStartReport?: () => void;
   onCouncilUpdate?: () => void;
   onProfile?: () => void;
+  onIssuePress?: (issueId: string) => void;
+  onHistory?: () => void;
 }
 
-const MyImpactScreen: React.FC<MyImpactScreenProps> = ({ onBack, onStartReport, onCouncilUpdate, onProfile }) => {
+const MyImpactScreen: React.FC<MyImpactScreenProps> = ({ onBack, onStartReport, onCouncilUpdate, onProfile, onIssuePress, onHistory }) => {
   const [selectedFilter, setSelectedFilter] = useState('All Fixed');
   const progressBarWidth = useRef(new Animated.Value(0)).current;
 
@@ -173,7 +175,7 @@ const MyImpactScreen: React.FC<MyImpactScreenProps> = ({ onBack, onStartReport, 
         <View style={styles.issuesList}>
           {resolvedIssues.map((issue, index) => (
             <SlideIn key={issue.id} delay={500 + index * 100} from="bottom" distance={20}>
-              <ScalePress>
+              <ScalePress onPress={() => onIssuePress?.(issue.id)}>
                 <View style={[styles.issueCard, index === 2 && { opacity: 0.9 }]}>
               {/* Top border gradient */}
               <LinearGradient
@@ -348,7 +350,7 @@ const MyImpactScreen: React.FC<MyImpactScreenProps> = ({ onBack, onStartReport, 
             </ScalePress>
           </View>
 
-          <ScalePress>
+          <ScalePress onPress={onHistory}>
             <View style={styles.navItem}>
               <MaterialIcons name="history" size={28} color="#9CA3AF" />
               <Text style={styles.navLabel}>History</Text>

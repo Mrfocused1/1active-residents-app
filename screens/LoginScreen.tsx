@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,7 +21,7 @@ const TOP_SECTION_HEIGHT = height * 0.4;
 
 interface LoginScreenProps {
   onBack?: () => void;
-  onLogin?: (credentials: { email: string; password: string }) => void;
+  onLogin?: (credentials: { email: string; password: string }) => Promise<void> | void;
   onCreateAccount?: () => void;
   onForgotPassword?: () => void;
 }
@@ -34,11 +35,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordStartedTyping, setPasswordStartedTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (email.trim() && password.trim()) {
+  const handlePasswordChange = (text: string) => {
+    if (text.length > 0 && !passwordStartedTyping) {
+      setPasswordStartedTyping(true);
+    }
+    setPassword(text);
+  };
+
+  const handleLogin = async () => {
+    if (email.trim() && password.trim() && !isLoading) {
       if (onLogin) {
-        onLogin({ email: email.trim(), password });
+        setIsLoading(true);
+        try {
+          await onLogin({ email: email.trim(), password });
+        } finally {
+          setIsLoading(false);
+        }
       }
     }
   };
@@ -137,13 +152,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                 </View>
                 <TextInput
                   style={styles.input}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   placeholderTextColor="#9CA3AF"
                   value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
+                  onChangeText={handlePasswordChange}
+                  secureTextEntry={passwordStartedTyping && !showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  textContentType="none"
+                  autoComplete="off"
+                  spellCheck={false}
+                  keyboardType="default"
                 />
                 <TouchableOpacity
                   style={styles.eyeIcon}
@@ -168,18 +187,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.loginButton, (!email.trim() || !password.trim()) && styles.loginButtonDisabled]}
+              style={[styles.loginButton, (!email.trim() || !password.trim() || isLoading) && styles.loginButtonDisabled]}
               onPress={handleLogin}
               activeOpacity={0.8}
-              disabled={!email.trim() || !password.trim()}
+              disabled={!email.trim() || !password.trim() || isLoading}
             >
               <LinearGradient
-                colors={!email.trim() || !password.trim() ? ['#9CA3AF', '#9CA3AF'] : ['#3B82F6', '#2563EB']}
+                colors={!email.trim() || !password.trim() || isLoading ? ['#9CA3AF', '#9CA3AF'] : ['#3B82F6', '#2563EB']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.loginButtonGradient}
               >
-                <Text style={styles.loginButtonText}>Login</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 

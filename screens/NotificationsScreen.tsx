@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FadeIn, SlideIn, ScalePress } from '../components/animations';
 import ApiService from '../services/api.service';
 
@@ -20,6 +21,7 @@ interface NotificationsScreenProps {
   onSeeAll?: () => void;
   onCouncilUpdate?: () => void;
   onProfile?: () => void;
+  onNotificationPress?: (notification: Notification) => void;
 }
 
 interface Notification {
@@ -42,6 +44,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   onSeeAll,
   onCouncilUpdate,
   onProfile,
+  onNotificationPress,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +56,15 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
+
+      // Check for auth token first
+      const token = await AsyncStorage.getItem('@active_residents_token');
+      if (!token) {
+        console.log('📝 No auth token, showing empty notifications');
+        setIsLoading(false);
+        return;
+      }
+
       const response = await ApiService.getNotifications({ limit: 20 });
 
       if (response.data && Array.isArray(response.data)) {
@@ -62,7 +74,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         setNotifications(formattedNotifications);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.log('📝 Could not fetch notifications (user may not be logged in)');
       // Keep empty array if API fails
     } finally {
       setIsLoading(false);
@@ -238,7 +250,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             <View style={styles.notificationsList}>
               {getTodayNotifications().map((notification, index) => (
                 <SlideIn key={notification.id} delay={500 + index * 100} from="bottom" distance={20}>
-                  <ScalePress>
+                  <ScalePress onPress={() => onNotificationPress?.(notification)}>
                     <View
                       style={[
                         styles.notificationCard,
@@ -305,7 +317,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             <View style={styles.notificationsList}>
               {getYesterdayNotifications().map((notification, index) => (
                 <SlideIn key={notification.id} delay={500 + index * 100} from="bottom" distance={20}>
-                  <ScalePress>
+                  <ScalePress onPress={() => onNotificationPress?.(notification)}>
                     <View style={[styles.notificationCard, styles.notificationCardRead]}>
                   <View style={styles.notificationContent}>
                     <View
@@ -352,7 +364,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             <View style={styles.notificationsList}>
               {getEarlierNotifications().map((notification, index) => (
                 <SlideIn key={notification.id} delay={500 + index * 100} from="bottom" distance={20}>
-                  <ScalePress>
+                  <ScalePress onPress={() => onNotificationPress?.(notification)}>
                     <View style={[styles.notificationCard, styles.notificationCardOlder]}>
                   <View style={styles.notificationContent}>
                     <View
@@ -429,7 +441,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             </View>
           </ScalePress>
 
-          <ScalePress>
+          <ScalePress onPress={onCouncilUpdate}>
             <View style={styles.navItem}>
               <View style={styles.navItemWithBadge}>
                 <MaterialIcons name="chat-bubble-outline" size={28} color="#5B7CFA" />

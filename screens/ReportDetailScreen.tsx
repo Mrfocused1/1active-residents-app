@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { cleanReportTitle, getShortSummary } from '../utils/titleUtils';
 
 interface TimelineItem {
   id: string;
@@ -70,11 +71,11 @@ const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
   onAddMoreInfo,
 }) => {
   // Use live report data if available, otherwise use defaults
-  const title = reportData?.title || reportData?.service_name || 'Report Details';
+  const title = cleanReportTitle(reportData?.title) || reportData?.service_name || 'Report Details';
   const description = reportData?.detail || reportData?.description || 'No description available';
   const status = reportData?.status || 'open';
   const category = reportData?.service_name || 'General Report';
-  const location = reportData?.title || 'Location not specified';
+  const location = getShortSummary(reportData?.description, 60) || reportData?.service_name || 'Location not specified';
   const reportedDate = reportData?.requested_datetime
     ? new Date(reportData.requested_datetime).toLocaleString('en-GB', {
         day: 'numeric',
@@ -236,14 +237,9 @@ const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Report {reportId}</Text>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.shareButton} activeOpacity={0.8} onPress={handleShare}>
-              <MaterialIcons name="share" size={22} color="#5B7CFA" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.moreButton} activeOpacity={0.8} onPress={onMore}>
-              <MaterialIcons name="more-horiz" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.shareButton} activeOpacity={0.8} onPress={handleShare}>
+            <MaterialIcons name="share" size={22} color="#5B7CFA" />
+          </TouchableOpacity>
         </View>
 
         {/* Report Details Card */}

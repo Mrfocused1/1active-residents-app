@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDepartmentHeadName, DepartmentHeadDetails } from '../services/perplexityAPI';
 import LocationService from '../services/location.service';
 import geminiService from '../services/gemini.service';
@@ -66,8 +67,8 @@ const IssueDetailsScreen: React.FC<IssueDetailsScreenProps> = ({
     city: string;
     coordinates?: { latitude: number; longitude: number };
   }>({
-    address: '14 High Street',
-    city: 'Camden, London, NW1 7JE',
+    address: 'Loading...',
+    city: '',
   });
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [aiCategorization, setAiCategorization] = useState<{
@@ -80,6 +81,32 @@ const IssueDetailsScreen: React.FC<IssueDetailsScreenProps> = ({
   const maxChars = 500;
 
   // Update location when reportData changes (from map selection)
+  // Load user's default preference for receiving updates
+  useEffect(() => {
+    const loadReceiveUpdatesPreference = async () => {
+      try {
+        const pref = await AsyncStorage.getItem('@receive_updates_default');
+        if (pref !== null) {
+          setReceiveUpdates(pref === 'true');
+        }
+      } catch (error) {
+        console.error('Error loading receive updates preference:', error);
+      }
+    };
+    loadReceiveUpdatesPreference();
+  }, []);
+
+  // Handler for toggling receive updates - saves as default for future reports
+  const handleReceiveUpdatesToggle = async () => {
+    const newValue = !receiveUpdates;
+    setReceiveUpdates(newValue);
+    try {
+      await AsyncStorage.setItem('@receive_updates_default', newValue ? 'true' : 'false');
+    } catch (error) {
+      console.error('Error saving receive updates preference:', error);
+    }
+  };
+
   useEffect(() => {
     if (reportData?.location) {
       console.log('📍 Updating location from reportData:', reportData.location);
@@ -528,7 +555,7 @@ const IssueDetailsScreen: React.FC<IssueDetailsScreenProps> = ({
         <View style={styles.checkboxCard}>
           <TouchableOpacity
             style={styles.checkbox}
-            onPress={() => setReceiveUpdates(!receiveUpdates)}
+            onPress={handleReceiveUpdatesToggle}
             activeOpacity={0.8}
           >
             <View

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Switch,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface NotificationSettingsScreenProps {
   onBack?: () => void;
@@ -147,10 +148,46 @@ const NotificationSettingsScreen: React.FC<NotificationSettingsScreenProps> = ({
     },
   ]);
 
+  // Load saved preferences on mount
+  useEffect(() => {
+    loadSavedPreferences();
+  }, []);
+
+  const loadSavedPreferences = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('@notification_category_preferences');
+      if (saved) {
+        const savedPrefs = JSON.parse(saved) as Record<string, boolean>;
+        setCategories(prev =>
+          prev.map(cat => ({
+            ...cat,
+            enabled: savedPrefs[cat.id] !== undefined ? savedPrefs[cat.id] : cat.enabled,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error loading notification preferences:', error);
+    }
+  };
+
+  const savePreferences = async (updatedCategories: NotificationCategory[]) => {
+    try {
+      const prefs: Record<string, boolean> = {};
+      updatedCategories.forEach(cat => {
+        prefs[cat.id] = cat.enabled;
+      });
+      await AsyncStorage.setItem('@notification_category_preferences', JSON.stringify(prefs));
+    } catch (error) {
+      console.error('Error saving notification preferences:', error);
+    }
+  };
+
   const handleToggle = (id: string) => {
-    setCategories((prev) =>
-      prev.map((cat) => (cat.id === id ? { ...cat, enabled: !cat.enabled } : cat))
-    );
+    setCategories((prev) => {
+      const updated = prev.map((cat) => (cat.id === id ? { ...cat, enabled: !cat.enabled } : cat));
+      savePreferences(updated);
+      return updated;
+    });
   };
 
   return (
