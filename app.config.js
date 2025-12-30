@@ -27,7 +27,7 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "uk.co.activeresidents.mobile",
-      buildNumber: "2",
+      buildNumber: "3",
       infoPlist: {
         NSLocationWhenInUseUsageDescription: "Active Residents uses your location to show nearby community issues on the map.",
         NSCameraUsageDescription: "Active Residents uses your camera to take photos of community issues you want to report.",
